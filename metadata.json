@@ -1,0 +1,8 @@
+{
+  "name": "Once Upon 2.0 (Remixed)",
+  "description": "Vintage-inspired blankets and swaddles for little dreamers. Soft, breathable, and made for dreaming.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

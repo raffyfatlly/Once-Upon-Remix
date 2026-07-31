@@ -1,0 +1,205 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>Once Upon | Where Every Design Tells A Story</title>
+    <meta name="title" content="Once Upon | Where Every Design Tells A Story">
+    <meta name="description" content="Vintage-inspired blankets and swaddles for little dreamers. Soft, breathable, and made for dreaming.">
+    
+    <!-- PWA Manifest & Theme -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#FFFDF9">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://onceupon.com/">
+    <meta property="og:title" content="Once Upon | Where Every Design Tells A Story">
+    <meta property="og:description" content="Vintage-inspired blankets and swaddles for little dreamers. Soft, breathable, and made for dreaming.">
+    <meta property="og:image" content="https://i.postimg.cc/rm65hx0j/Gemini-Generated-Image-6xc5k56xc5k56xc5-(1)-(2)-(1).png">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://onceupon.com/">
+    <meta property="twitter:title" content="Once Upon | Where Every Design Tells A Story">
+    <meta property="twitter:description" content="Vintage-inspired blankets and swaddles for little dreamers. Soft, breathable, and made for dreaming.">
+    <meta property="twitter:image" content="https://i.postimg.cc/rm65hx0j/Gemini-Generated-Image-6xc5k56xc5k56xc5-(1)-(2)-(1).png">
+
+    <!-- Favicon (Default Square Fallback) -->
+    <link id="favicon" rel="icon" type="image/png" href="https://i.postimg.cc/gJn37wVJ/favicon-32x32.png">
+    <!-- Apple Touch Icon (iOS automatically rounds this) -->
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/gJn37wVJ/favicon-32x32.png">
+
+    <!-- Dynamic Round Favicon Script -->
+    <script>
+      (function() {
+        var imgUrl = "https://i.postimg.cc/gJn37wVJ/favicon-32x32.png";
+        var img = new Image();
+        // Request permission to load image for canvas manipulation
+        img.crossOrigin = "Anonymous";
+        img.src = imgUrl;
+        img.onload = function() {
+          try {
+            var canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            var ctx = canvas.getContext('2d');
+            
+            // Create circular clip path
+            ctx.beginPath();
+            ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+            ctx.closePath();
+            ctx.clip();
+            
+            // Draw image into circle
+            ctx.drawImage(img, 0, 0, 32, 32);
+            
+            // Update the link tag
+            var link = document.getElementById('favicon');
+            if (link) {
+              link.href = canvas.toDataURL();
+            }
+          } catch (e) {
+            // Fallback to square if CORS fails or browser restricts canvas
+            console.log("Could not round favicon programmatically, keeping square fallback.");
+          }
+        };
+      })();
+    </script>
+    
+    <!-- PWA Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Pinyon+Script&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    
+    <!-- Tailwind Configuration -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-grey': '#F0F2F2',
+              'brand-latte': '#D9C4B8',
+              'brand-cream': '#F2DDD0',
+              'brand-pink': '#F2B2AC',
+              'brand-flamingo': '#F2A0A0',
+              'brand-gold': '#C5A992',
+              'brand-green': '#4A5D4F',
+            },
+            fontFamily: {
+              serif: ['"Playfair Display"', 'serif'],
+              sans: ['"Lato"', 'sans-serif'],
+              script: ['"Pinyon Script"', 'cursive'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 1s ease-out',
+              'slide-up': 'slideUp 0.8s ease-out',
+              'float': 'float 6s ease-in-out infinite',
+              'float-delayed': 'float 6s ease-in-out 3s infinite',
+              'breathe': 'breathe 8s ease-in-out infinite',
+              'rotate-slow': 'rotate 30s linear infinite',
+              'spin-slow': 'rotate 12s linear infinite',
+              'cart-alert': 'cartAlert 0.8s ease-in-out',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              breathe: {
+                '0%, 100%': { transform: 'scale(1) rotate(0deg)', opacity: '0.4' },
+                '50%': { transform: 'scale(1.05) rotate(1deg)', opacity: '0.6' },
+              },
+              rotate: {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' },
+              },
+              cartAlert: {
+                '0%': { transform: 'scale(1) rotate(0deg)' },
+                '20%': { transform: 'scale(1.25) rotate(-8deg)' },
+                '40%': { transform: 'scale(1.25) rotate(8deg)' },
+                '60%': { transform: 'scale(1.25) rotate(-4deg)' },
+                '80%': { transform: 'scale(1.1) rotate(4deg)' },
+                '100%': { transform: 'scale(1) rotate(0deg)' },
+              }
+            },
+            backgroundImage: {
+              'shimmer': 'linear-gradient(45deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 60%)',
+              'paper': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E\")"
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      html { scroll-behavior: smooth; }
+      body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #fff;
+      }
+      .scallop-border {
+         background-image: radial-gradient(circle at 50% 100%, white 70%, transparent 71%);
+         background-size: 20px 10px;
+         background-repeat: repeat-x;
+         background-position: bottom;
+         height: 10px;
+         width: 100%;
+      }
+      .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "firebase/": "https://esm.sh/firebase@^12.9.0/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.3"
+  }
+}
+</script>
+</head>
+  <body class="bg-paper text-gray-800">
+    <div id="root">
+       <!-- Loading State -->
+       <div style="height: 100vh; display: flex; align-items: center; justify-content: center; color: #D9C4B8;">
+         <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+       </div>
+    </div>
+    <!-- Vite Entry Point -->
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+
+{
+  "name": "Once Upon",
+  "short_name": "Once Upon",
+  "description": "Vintage-inspired blankets and swaddles for little dreamers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFDF9",
+  "theme_color": "#FFFDF9",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/gJn37wVJ/favicon-32x32.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://i.postimg.cc/gJn37wVJ/favicon-32x32.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
