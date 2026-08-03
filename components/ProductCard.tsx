@@ -46,7 +46,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
            <div className="w-full h-full overflow-hidden p-3 bg-white relative">
               <div className="w-full h-full overflow-hidden rounded-[16px] relative">
                 {/* Removed grayscale and opacity logic to make product clear */}
-                <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-[1.5s] ease-in-out group-hover:scale-110" />
+                {product.image ? (
+                  <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover transition-transform duration-[1.5s] ease-in-out group-hover:scale-110" />
+                ) : (
+                  <div className="w-full h-full bg-brand-pink/5 flex flex-col items-center justify-center text-gray-400 p-4 text-center border border-brand-latte/20">
+                    <Sparkles size={24} className="text-brand-gold/60 mb-2 animate-pulse" />
+                    <span className="font-serif text-xs text-gray-500 font-medium">Photo Coming Soon</span>
+                  </div>
+                )}
                 
                 {isPreOrder ? (
                   // Center position. Restored to text-[10px] for better visibility as requested.

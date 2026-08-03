@@ -185,7 +185,14 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
           <div className="flex flex-col gap-6">
             <div className="relative aspect-[3/4] bg-brand-grey/5 rounded-[2px] overflow-hidden group border border-brand-latte/10">
                {/* Removed grayscale here */}
-               <img src={activeImage || product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+               {(activeImage || product.image) ? (
+                 <img src={activeImage || product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+               ) : (
+                 <div className="w-full h-full bg-brand-pink/5 flex flex-col items-center justify-center text-gray-400 p-8 text-center border border-brand-latte/20">
+                   <Leaf size={32} className="text-brand-gold/60 mb-3 animate-pulse" />
+                   <span className="font-serif text-sm text-gray-500 font-medium">Photo Coming Soon</span>
+                 </div>
+               )}
                {isPreOrder ? (
                   // Made smaller on mobile (px-3 py-1.5 text-xs) and larger on desktop (md:px-6 md:py-3 md:text-xl)
                   <div className="absolute top-4 right-4 pointer-events-none">
