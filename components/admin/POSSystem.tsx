@@ -647,11 +647,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const [showCheckoutItems, setShowCheckoutItems] = useState(false);
 
   // Promo and Discount states
-  const [isAutoPromoDeleted, setIsAutoPromoDeleted] = useState(false);
   const [isFreeShippingPromoDeleted, setIsFreeShippingPromoDeleted] = useState(false);
   const [posDiscount, setPosDiscount] = useState<{ type: 'percent' | 'flat'; value: number; label: string } | null>(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
-  const [customDiscountName, setCustomDiscountName] = useState("Tomorrow's Sale");
+  const [customDiscountName, setCustomDiscountName] = useState("Special Discount");
   const [customDiscountType, setCustomDiscountType] = useState<'percent' | 'flat'>('percent');
   const [customDiscountValue, setCustomDiscountValue] = useState(10);
 
@@ -772,15 +771,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Auto RM 8 discount for each blanket or swaddle (not addon, not perfume or hair oil)
-  const autoPromoDiscountAmount = isAutoPromoDeleted 
-    ? 0 
-    : cart.reduce((sum, item) => {
-        if (!isAddonProduct(item) && !isPerfumeOrHairOil(item)) {
-          return sum + (8 * item.quantity);
-        }
-        return sum;
-      }, 0);
+  const autoPromoDiscountAmount = 0;
 
   // Shipping cost if shipping pre-order
   const getStandardShippingCost = () => {
@@ -812,7 +803,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
     ? (posDiscount.type === 'percent' ? (subtotal * posDiscount.value / 100) : posDiscount.value)
     : 0;
 
-  const total = Math.max(0, subtotal + actualShippingCost - autoPromoDiscountAmount - customDiscountAmount);
+  const total = Math.max(0, subtotal + actualShippingCost - customDiscountAmount);
 
   const handleConfirmOrder = async () => {
     setIsProcessing(true);
@@ -823,9 +814,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
         if (!isFreeShippingPromoDeleted) {
           promoNotes.push(`[Free Shipping Promo applied - Saved RM ${standardShippingCost.toFixed(2)}]`);
         }
-      }
-      if (!isAutoPromoDeleted && autoPromoDiscountAmount > 0) {
-        promoNotes.push(`[Auto Blanket/Swaddle Promo applied - Saved RM ${autoPromoDiscountAmount.toFixed(2)}]`);
       }
       if (posDiscount) {
         promoNotes.push(`[POS Discount Applied: ${posDiscount.label} (${posDiscount.type === 'percent' ? `${posDiscount.value}%` : `RM ${posDiscount.value}`} off - Saved RM ${customDiscountAmount.toFixed(2)})]`);
@@ -873,7 +861,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
       setCashierRemark('');
       setIsShippingPreOrder(false);
       setShippingDetails({ address: '', postcode: '', city: '', region: 'west' });
-      setIsAutoPromoDeleted(false);
       setIsFreeShippingPromoDeleted(false);
     } catch (error: any) {
       alert("Failed to process order: " + error.message);
@@ -1082,14 +1069,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               <span className="font-bold text-gray-400 uppercase tracking-widest text-[10px] md:text-xs">Subtotal</span>
               <span className="font-mono text-gray-600">RM {subtotal.toFixed(2)}</span>
             </div>
-
-            {/* Auto RM 8 discount for blankets/swaddles */}
-            {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
-              <div className="flex justify-between items-center text-xs md:text-sm text-brand-flamingo">
-                <span className="font-bold uppercase tracking-widest text-[10px] md:text-xs">🏷️ RM 8 Auto Promo</span>
-                <span className="font-mono">- RM {autoPromoDiscountAmount.toFixed(2)}</span>
-              </div>
-            )}
 
             {/* Pre-Order Shipping and Free Shipping Discount */}
             {isShippingPreOrder && (
@@ -1314,27 +1293,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
         <div className={`flex-[2] bg-white border border-brand-latte/20 rounded shadow-sm overflow-y-auto p-4 md:p-6 ${
           activeMobileTab === 'products' ? 'block' : 'hidden md:block'
         }`}>
-          
-          {/* AUTO PROMO BANNER */}
-          <div 
-            className="border border-dashed border-brand-flamingo/50 bg-[#fffdfa] p-3 md:p-4 mb-4 md:mb-6 relative"
-            style={{ 
-              borderRadius: '12px',
-              boxShadow: '0 4px 10px rgba(230,120,110,0.04)'
-            }}
-          >
-            <div className="absolute top-2.5 right-4 text-[9px] font-sans font-bold uppercase tracking-widest bg-brand-flamingo text-white px-2.5 py-1 rounded-full flex items-center gap-1 animate-pulse">
-              <Sparkles size={8} /> Active Promo
-            </div>
-            
-            <h3 className="font-serif text-sm md:text-base text-gray-900 mb-1 flex items-center gap-1.5 tracking-wide font-semibold">
-              🎁 Auto POS Discount Active
-            </h3>
-            <p className="text-xs text-gray-600 font-sans leading-relaxed">
-              Every swaddle and blanket added to the order automatically receives an <strong className="text-brand-flamingo">RM 8.00 discount each</strong>. 
-              Pre-order shipping options also automatically receive <strong className="text-brand-gold">Free Shipping</strong>.
-            </p>
-          </div>
 
           {/* SECTION 1: STANDARD PRODUCTS MENU */}
           <div id="pos-menu-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
@@ -1552,22 +1510,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                 <span className="font-mono">RM {subtotal.toFixed(2)}</span>
               </div>
   
-              {/* Auto RM 8 discount for blankets/swaddles */}
-              {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
-                <div className="flex justify-between items-center text-brand-flamingo text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold uppercase bg-brand-flamingo/10 px-1.5 py-0.5 rounded tracking-wider">🏷️ RM 8 Auto Promo</span>
-                    <button 
-                      onClick={() => setIsAutoPromoDeleted(true)}
-                      className="text-[10px] text-red-500 hover:underline font-bold uppercase tracking-wider cursor-pointer p-1.5 -my-1"
-                    >
-                      [Delete]
-                    </button>
-                  </div>
-                  <span className="font-mono font-bold">- RM {autoPromoDiscountAmount.toFixed(2)}</span>
-                </div>
-              )}
-  
               {/* Pre-Order Shipping and Free Shipping Discount */}
               {isShippingPreOrder && (
                 <>
@@ -1615,15 +1557,6 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   
             {/* Promo Re-apply & Discount Buttons */}
             <div className="space-y-1.5 mb-3">
-              {(isAutoPromoDeleted && autoPromoDiscountAmount > 0) && (
-                <button 
-                  type="button"
-                  onClick={() => setIsAutoPromoDeleted(false)}
-                  className="w-full bg-brand-flamingo/5 border border-brand-flamingo/20 text-brand-flamingo py-2 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-brand-flamingo/10 transition-colors cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Tag size={10} /> Re-apply RM 8 Auto Promo
-                </button>
-              )}
               {(isShippingPreOrder && isFreeShippingPromoDeleted && standardShippingCost > 0) && (
                 <button 
                   type="button"
