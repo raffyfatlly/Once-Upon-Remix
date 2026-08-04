@@ -647,6 +647,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const [showCheckoutItems, setShowCheckoutItems] = useState(false);
 
   // Promo and Discount states
+  const [isAutoPromoDeleted, setIsAutoPromoDeleted] = useState(false);
   const [isFreeShippingPromoDeleted, setIsFreeShippingPromoDeleted] = useState(false);
   const [posDiscount, setPosDiscount] = useState<{ type: 'percent' | 'flat'; value: number; label: string } | null>(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -771,7 +772,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const autoPromoDiscountAmount = 0;
+  // Auto RM 8 discount per item if totalItems > 1
+  const autoPromoDiscountAmount = (!isAutoPromoDeleted && totalItems > 1) ? (8 * totalItems) : 0;
 
   // Shipping cost if shipping pre-order
   const getStandardShippingCost = () => {
@@ -803,12 +805,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
     ? (posDiscount.type === 'percent' ? (subtotal * posDiscount.value / 100) : posDiscount.value)
     : 0;
 
-  const total = Math.max(0, subtotal + actualShippingCost - customDiscountAmount);
+  const total = Math.max(0, subtotal + actualShippingCost - autoPromoDiscountAmount - customDiscountAmount);
 
   const handleConfirmOrder = async () => {
     setIsProcessing(true);
     try {
       let promoNotes = [];
+      if (!isAutoPromoDeleted && autoPromoDiscountAmount > 0) {
+        promoNotes.push(`[Multi-Item Promo: RM 8 off per item (${totalItems} items) - Saved RM ${autoPromoDiscountAmount.toFixed(2)}]`);
+      }
       if (isShippingPreOrder) {
         promoNotes.push('[Pre-Order Shipping]');
         if (!isFreeShippingPromoDeleted) {
@@ -843,8 +848,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
         paymentMethod: paymentMethod
       };
 
-      if (cashierRemark.trim()) {
-        orderData.adminNotes = cashierRemark.trim();
+      if (cashierRemark.trim() || promoNotes.length > 0) {
+        orderData.adminNotes = [cashierRemark.trim(), ...promoNotes].filter(Boolean).join(' ');
       }
 
       const orderDocRef = await createOrderInDb(orderData);
@@ -861,6 +866,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
       setCashierRemark('');
       setIsShippingPreOrder(false);
       setShippingDetails({ address: '', postcode: '', city: '', region: 'west' });
+      setIsAutoPromoDeleted(false);
       setIsFreeShippingPromoDeleted(false);
     } catch (error: any) {
       alert("Failed to process order: " + error.message);
@@ -1069,6 +1075,23 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               <span className="font-bold text-gray-400 uppercase tracking-widest text-[10px] md:text-xs">Subtotal</span>
               <span className="font-mono text-gray-600">RM {subtotal.toFixed(2)}</span>
             </div>
+
+            {/* Multi-Item Auto RM 8 Discount */}
+            {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
+              <div className="flex justify-between items-center text-xs md:text-sm text-brand-flamingo">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold uppercase tracking-widest text-[10px] md:text-xs">🏷️ RM 8 Off Per Item ({totalItems} items)</span>
+                  <button 
+                    type="button"
+                    onClick={() => setIsAutoPromoDeleted(true)}
+                    className="text-[10px] text-red-500 hover:underline font-bold uppercase tracking-wider cursor-pointer p-1 -my-1"
+                  >
+                    [Delete]
+                  </button>
+                </div>
+                <span className="font-mono font-bold">- RM {autoPromoDiscountAmount.toFixed(2)}</span>
+              </div>
+            )}
 
             {/* Pre-Order Shipping and Free Shipping Discount */}
             {isShippingPreOrder && (
@@ -1294,6 +1317,30 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
           activeMobileTab === 'products' ? 'block' : 'hidden md:block'
         }`}>
 
+          {/* MULTI-ITEM PROMO BANNER */}
+          <div 
+            className="border border-dashed border-brand-flamingo/40 bg-brand-pink/5 p-3 md:p-3.5 mb-4 relative rounded-xl"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-brand-flamingo shrink-0" />
+                <div>
+                  <h4 className="font-serif text-xs md:text-sm text-gray-900 font-semibold">
+                    🎁 Multi-Item Discount Active
+                  </h4>
+                  <p className="text-[11px] text-gray-600 font-sans leading-tight">
+                    Add 2 or more items to get <strong className="text-brand-flamingo">RM 8.00 off per item</strong> automatically!
+                  </p>
+                </div>
+              </div>
+              {totalItems > 1 && !isAutoPromoDeleted && (
+                <span className="bg-brand-flamingo text-white text-[9px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm">
+                  RM {autoPromoDiscountAmount.toFixed(2)} OFF ({totalItems} items)
+                </span>
+              )}
+            </div>
+          </div>
+
           {/* SECTION 1: STANDARD PRODUCTS MENU */}
           <div id="pos-menu-header" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
             <h2 className="font-serif text-xl md:text-2xl text-gray-900 tracking-wide font-medium">POS Menu</h2>
@@ -1509,6 +1556,22 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                 <span className="font-bold uppercase tracking-widest text-[10px]">Subtotal</span>
                 <span className="font-mono">RM {subtotal.toFixed(2)}</span>
               </div>
+
+              {/* Multi-Item Auto RM 8 Discount */}
+              {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
+                <div className="flex justify-between items-center text-brand-flamingo text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase bg-brand-flamingo/10 px-1.5 py-0.5 rounded tracking-wider">🏷️ RM 8 Off Per Item ({totalItems})</span>
+                    <button 
+                      onClick={() => setIsAutoPromoDeleted(true)}
+                      className="text-[10px] text-red-500 hover:underline font-bold uppercase tracking-wider cursor-pointer p-1.5 -my-1"
+                    >
+                      [Delete]
+                    </button>
+                  </div>
+                  <span className="font-mono font-bold">- RM {autoPromoDiscountAmount.toFixed(2)}</span>
+                </div>
+              )}
   
               {/* Pre-Order Shipping and Free Shipping Discount */}
               {isShippingPreOrder && (
@@ -1557,6 +1620,15 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   
             {/* Promo Re-apply & Discount Buttons */}
             <div className="space-y-1.5 mb-3">
+              {(isAutoPromoDeleted && totalItems > 1) && (
+                <button 
+                  type="button"
+                  onClick={() => setIsAutoPromoDeleted(false)}
+                  className="w-full bg-brand-flamingo/5 border border-brand-flamingo/20 text-brand-flamingo py-2 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-brand-flamingo/10 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                >
+                  <Tag size={10} /> Re-apply RM 8 Multi-Item Promo
+                </button>
+              )}
               {(isShippingPreOrder && isFreeShippingPromoDeleted && standardShippingCost > 0) && (
                 <button 
                   type="button"
