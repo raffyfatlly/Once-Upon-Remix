@@ -20,6 +20,7 @@ import { RefundPolicy, ShippingPolicy, PrivacyPolicy, TermsPolicy, BusinessInfoP
 import { LinkRedirector } from './components/LinkRedirector';
 import { AmbassadorLogin } from './components/AmbassadorLogin';
 import { AmbassadorDashboard } from './components/AmbassadorDashboard';
+import { CakenicLandingPage } from './components/CakenicLandingPage';
 import { Product, SiteConfig, CartItem, Order, Ambassador } from './types';
 import { Star, Cloud, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { subscribeToProducts, subscribeToOrders } from './firebase';
@@ -806,6 +807,20 @@ const App: React.FC = () => {
 
         <Route path="/payment/callback" element={
           <PaymentCallback />
+        } />
+
+        {/* Cakenic Event Landing Page Routes */}
+        <Route path="/cakenic" element={
+          <CakenicLandingPage 
+            onAddToCart={handleAddToCart}
+            products={products}
+          />
+        } />
+        <Route path="/cakenic-event" element={
+          <CakenicLandingPage 
+            onAddToCart={handleAddToCart}
+            products={products}
+          />
         } />
 
         {/* Policy Routes */}
