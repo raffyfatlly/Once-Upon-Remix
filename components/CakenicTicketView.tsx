@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Ticket, CheckCircle, Calendar, MapPin, Copy, Check, Share2, Printer, XCircle, ArrowLeft, MessageCircle, AlertCircle, Sparkles } from 'lucide-react';
+import { Ticket, CheckCircle, Calendar, MapPin, Copy, Check, Share2, Download, XCircle, ArrowLeft, AlertCircle, Sparkles } from 'lucide-react';
 import { Order } from '../types';
 
 interface CakenicTicketViewProps {
@@ -23,13 +23,9 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
     setTimeout(() => setCopiedId(false), 2500);
   };
 
-  const handlePrint = () => {
+  const handleDownload = () => {
     window.print();
   };
-
-  const whatsappMessage = encodeURIComponent(
-    `Hi Vanillicious team! I have a question about my Cakenic Order #${order.id} (${order.customerName}).`
-  );
 
   // If this is a payment cancellation state
   if (isCancel || order.status === 'cancelled' || order.status === 'failed') {
@@ -226,19 +222,6 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
             </div>
           </div>
         </div>
-
-        {/* Barcode Graphic */}
-        <div className="pt-3 border-t border-[#332524]/10 text-center space-y-1">
-          <div className="font-mono text-[9px] text-[#6B5450] uppercase tracking-[0.25em]">
-            ENTRY BARCODE VERIFICATION
-          </div>
-          <div className="h-10 bg-gradient-to-r from-[#332524] via-[#6B5450] to-[#332524] rounded-md opacity-80 flex items-center justify-center p-1">
-            <div className="w-full h-full bg-[repeating-linear-gradient(90deg,#fff_0px,#fff_2px,#332524_2px,#332524_6px,#fff_6px,#fff_7px,#332524_7px,#332524_11px)]"></div>
-          </div>
-          <div className="font-mono text-[10px] text-[#332524] font-bold tracking-widest">
-            CKN-2026-00{order.id}
-          </div>
-        </div>
       </div>
 
       {/* --- QUICK CHECKLIST / RULES REMINDER --- */}
@@ -256,37 +239,25 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
 
       {/* --- ACTION BUTTONS --- */}
       <div className="mt-6 space-y-2.5 print:hidden">
-        <div className="grid grid-cols-2 gap-2.5">
-          <button
-            onClick={handlePrint}
-            className="w-full bg-white border border-[#332524]/15 hover:bg-[#F1E8E2] text-[#332524] py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
-          >
-            <Printer size={15} />
-            <span>Print E-Pass</span>
-          </button>
-
-          <a
-            href={`https://wa.me/60120000000?text=${whatsappMessage}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white py-3 px-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
-          >
-            <MessageCircle size={15} />
-            <span>WhatsApp</span>
-          </a>
-        </div>
+        <button
+          onClick={handleDownload}
+          className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <Download size={16} />
+          <span>Download E Ticket</span>
+        </button>
 
         {onClose ? (
           <button
             onClick={onClose}
-            className="w-full bg-[#332524] hover:bg-[#4a3635] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+            className="w-full bg-[#332524] hover:bg-[#4a3635] text-white py-3 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>Close Ticket Window</span>
           </button>
         ) : (
           <a
             href="/#/cakenic"
-            className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2"
+            className="w-full bg-[#332524] hover:bg-[#4a3635] text-white py-3 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2"
           >
             <ArrowLeft size={16} />
             <span>Back to Cakenic Landing Page</span>

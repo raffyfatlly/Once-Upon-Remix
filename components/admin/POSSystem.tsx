@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Product, CartItem, Order } from '../../types';
 import { createOrderInDb } from '../../firebase';
+import { getMatchedProduct, getItemDisplayName } from './SalesManager';
 import { 
   Plus, Minus, Trash2, CreditCard, QrCode, CheckCircle, ChevronLeft, 
   Tag, Percent, Sparkles, X, Box, Gift, Flame, Printer, Mail, Loader2
@@ -28,7 +29,7 @@ const formatKLTime = (dateString: string) => {
   });
 };
 
-export const generateReceiptHtml = (order: Order): string => {
+export const generateReceiptHtml = (order: Order, products?: Product[]): string => {
 
   const cleanNotes = order.adminNotes ? order.adminNotes.replace(/\[.*?\]/g, '').trim() : '';
 
@@ -384,15 +385,17 @@ export const generateReceiptHtml = (order: Order): string => {
           </thead>
           <tbody>
             ${order.items.map(item => {
-              const isAddon = Boolean(item.isCheckoutAddon);
-              const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && item.id.startsWith('cakenic'));
-              const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+              const matched = getMatchedProduct(item, products);
+              const displayName = getItemDisplayName(item, products);
+              const isAddon = matched ? (Boolean(matched.isCheckoutAddon) || matched.category === 'Add-on') : Boolean(item.isCheckoutAddon);
+              const isCakenicTicket = (matched?.collection === 'Cakenic Ticket' || matched?.category === 'Event Ticket' || Boolean(matched?.isCakenicOnly)) || item.collection === 'Cakenic Ticket' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && item.id.startsWith('cakenic'));
+              const isBlanket = !isCakenicTicket && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'))));
               const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket' : 'Swaddle'));
               const fulfillmentStatus = order.source === 'pos' ? (item.isPickedUp !== false ? 'Handed Over In-store' : 'To Pack & Ship') : 'To Pack & Ship';
               return `
                 <tr>
                   <td>
-                    <div class="item-desc">${item.name}</div>
+                    <div class="item-desc">${displayName}</div>
                     <div class="item-sub">${itemCollection} ${item.isPreOrder ? '(Pre-Order)' : ''} • Status: ${fulfillmentStatus}</div>
                   </td>
                   <td class="item-qty">${item.quantity}</td>
@@ -513,7 +516,7 @@ export const generateReceiptHtml = (order: Order): string => {
   return htmlContent;
 };
 
-export const generateReceiptText = (order: Order): string => {
+export const generateReceiptText = (order: Order, products?: Product[]): string => {
   const cleanNotes = order.adminNotes ? order.adminNotes.replace(/\[.*?\]/g, '').trim() : '';
   const itemsSubtotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   
@@ -530,9 +533,10 @@ export const generateReceiptText = (order: Order): string => {
 
   let itemsText = '';
   order.items.forEach(item => {
+    const displayName = getItemDisplayName(item, products);
     const itemTotal = (item.price * item.quantity).toFixed(2);
     const fulfillmentStatus = order.source === 'pos' ? (item.isPickedUp !== false ? 'Handed Over' : 'To Pack & Ship') : 'To Pack & Ship';
-    itemsText += `${item.name} (${fulfillmentStatus})\n  Qty: ${item.quantity} x RM ${Number(item.price).toFixed(2)} = RM ${itemTotal}\n\n`;
+    itemsText += `${displayName} (${fulfillmentStatus})\n  Qty: ${item.quantity} x RM ${Number(item.price).toFixed(2)} = RM ${itemTotal}\n\n`;
   });
 
   let promoSection = '';

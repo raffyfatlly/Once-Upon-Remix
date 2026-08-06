@@ -84,17 +84,83 @@ const getKLDateFromIso = (isoString: string) => {
    return `${year}-${month}-${day}`;
 };
 
-const getNormalizedProductInfo = (item: { name: string; collection?: string; category?: string; isCheckoutAddon?: boolean }) => {
-  const collection = item.collection || '';
-  const category = item.category || '';
-  let name = item.name.trim().replace(/\s*\+\s*Extra\s+Protection\s+Box/gi, '').trim();
+export const getMatchedProduct = (item: { id?: string; baseProductId?: string; name?: string }, products?: Product[]): Product | null => {
+  if (!products || !products.length) return null;
+
+  if (item.baseProductId) {
+    const matched = products.find(p => p.id === item.baseProductId);
+    if (matched) return matched;
+  }
+
+  if (item.id) {
+    const matched = products.find(p => p.id === item.id);
+    if (matched) return matched;
+
+    const matchedPrefix = products.find(p => p.id && (item.id!.startsWith(p.id) || item.id!.includes(p.id)));
+    if (matchedPrefix) return matchedPrefix;
+  }
+
+  if (item.name) {
+    const rawName = item.name.trim();
+    const lowerRaw = rawName.toLowerCase();
+    
+    const exactName = products.find(p => p.name.trim().toLowerCase() === lowerRaw);
+    if (exactName) return exactName;
+
+    const cleanItemName = lowerRaw.replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim();
+    const cleanMatched = products.find(p => p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim() === cleanItemName);
+    if (cleanMatched) return cleanMatched;
+
+    if (cleanItemName.length >= 3) {
+      const partial = products.find(p => {
+        const pClean = p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim();
+        return pClean.includes(cleanItemName) || cleanItemName.includes(pClean);
+      });
+      if (partial) return partial;
+    }
+  }
+
+  return null;
+};
+
+export const getItemDisplayName = (item: { name: string; sizeOption?: string; id?: string; baseProductId?: string }, products?: Product[]): string => {
+  const matched = getMatchedProduct(item, products);
+  if (!matched) return item.name;
+
+  if (item.sizeOption && !matched.name.includes(`(${item.sizeOption})`)) {
+    return `${matched.name} (${item.sizeOption})`;
+  }
+
+  if (item.name.includes('(Adult)') && !matched.name.includes('(Adult)')) {
+    return `${matched.name} (Adult)`;
+  }
+  if (item.name.includes('(Baby)') && !matched.name.includes('(Baby)')) {
+    return `${matched.name} (Baby)`;
+  }
+
+  return matched.name;
+};
+
+export const getItemDisplayImage = (item: { image: string; id?: string; baseProductId?: string; name?: string }, products?: Product[]): string => {
+  const matched = getMatchedProduct(item, products);
+  return matched?.image || item.image || '';
+};
+
+const getNormalizedProductInfo = (item: { id?: string; baseProductId?: string; name: string; collection?: string; category?: string; isCheckoutAddon?: boolean }, products?: Product[]) => {
+  const matched = getMatchedProduct(item, products);
+  const nameToUse = matched ? matched.name : item.name;
+  const collectionToUse = matched?.collection || item.collection || '';
+  const categoryToUse = matched?.category || item.category || '';
+  const isCheckoutAddonToUse = matched?.isCheckoutAddon ?? item.isCheckoutAddon;
+
+  let name = nameToUse.trim().replace(/\s*\+\s*Extra\s+Protection\s+Box/gi, '').trim();
 
   // Determine if it is an Add-on product
-  const isAddon = Boolean(item.isCheckoutAddon) || 
-                  collection.toLowerCase().includes('add-on') || 
-                  collection.toLowerCase().includes('addon') || 
-                  category.toLowerCase().includes('add-on') || 
-                  category.toLowerCase().includes('addon') ||
+  const isAddon = Boolean(isCheckoutAddonToUse) || 
+                  collectionToUse.toLowerCase().includes('add-on') || 
+                  collectionToUse.toLowerCase().includes('addon') || 
+                  categoryToUse.toLowerCase().includes('add-on') || 
+                  categoryToUse.toLowerCase().includes('addon') ||
                   name.toLowerCase().includes('perfume') || 
                   name.toLowerCase().includes('hair oil') || 
                   name.toLowerCase().includes('oil') ||
@@ -110,11 +176,10 @@ const getNormalizedProductInfo = (item: { name: string; collection?: string; cat
   }
 
   // Determine if it is a blanket
-  const isBlanket = collection === 'Blankets' || 
-                    collection.toLowerCase().includes('blanket') ||
-                    category.toLowerCase().includes('blanket') ||
-                    // fallback if collection is empty but name suggests it
-                    (!collection && !category && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle') || name.toLowerCase().includes('flight')));
+  const isBlanket = collectionToUse === 'Blankets' || 
+                    collectionToUse.toLowerCase().includes('blanket') ||
+                    categoryToUse.toLowerCase().includes('blanket') ||
+                    (!collectionToUse && !categoryToUse && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle') || name.toLowerCase().includes('flight')));
 
   if (isBlanket) {
     if (name.includes('(Adult)')) {
@@ -132,7 +197,6 @@ const getNormalizedProductInfo = (item: { name: string; collection?: string; cat
         group: 'blanket'
       };
     } else {
-      // Default to Baby Blanket if no size is specified
       return {
         key: `${name}|Baby|Blankets`,
         displayLabel: `${name} (Baby Blanket)`,
@@ -142,10 +206,10 @@ const getNormalizedProductInfo = (item: { name: string; collection?: string; cat
   }
 
   // Determine if it is a swaddle
-  const isSwaddle = collection === 'Swaddle' || 
-                    collection === 'Swaddles' || 
-                    collection.toLowerCase().includes('swaddle') ||
-                    category.toLowerCase().includes('swaddle');
+  const isSwaddle = collectionToUse === 'Swaddle' || 
+                    collectionToUse === 'Swaddles' || 
+                    collectionToUse.toLowerCase().includes('swaddle') ||
+                    categoryToUse.toLowerCase().includes('swaddle');
 
   if (isSwaddle) {
     const baseName = name.replace('(Swaddle)', '').trim();
@@ -156,7 +220,6 @@ const getNormalizedProductInfo = (item: { name: string; collection?: string; cat
     };
   }
 
-  // Fallback
   return {
     key: name,
     displayLabel: name,
@@ -376,7 +439,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
 
     try {
       const subject = `Receipt for Order #${order.id.toUpperCase().substring(0, 8)} - Once Upon`;
-      const body = generateReceiptText(order);
+      const body = generateReceiptText(order, products);
       const mailtoUrl = `mailto:${encodeURIComponent(salesEmailInput)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       
       // Open default mail app on device
@@ -424,7 +487,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     orders.forEach(o => {
       if (o.items) {
         o.items.forEach(i => {
-          const info = getNormalizedProductInfo(i);
+          const info = getNormalizedProductInfo(i, products);
           if (!itemsMap.has(info.key)) {
             itemsMap.set(info.key, info);
           }
@@ -439,7 +502,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       }
       return a.displayLabel.localeCompare(b.displayLabel);
     });
-  }, [orders]);
+  }, [orders, products]);
 
   // --- AUTOMATED STALE ORDER CLEANUP ---
   // Runs on mount and every 60 seconds
@@ -719,18 +782,23 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
             </tr>
           </thead>
           <tbody>
-            ${order.items.map(item => `
+            ${order.items.map(item => {
+              const matched = getMatchedProduct(item, products);
+              const displayName = getItemDisplayName(item, products);
+              const collectionName = matched?.collection || item.collection || 'Blankets';
+              return `
               <tr>
                 <td>
                   <div class="item-name">
-                    ${item.name}
+                    ${displayName}
                     ${item.isPreOrder ? '<span class="preorder-tag">Pre-order</span>' : ''}
                   </div>
-                  <div class="item-meta">${item.collection || 'Blankets'}</div>
+                  <div class="item-meta">${collectionName}</div>
                 </td>
                 <td class="qty-col">${item.quantity}</td>
               </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
         
@@ -750,7 +818,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
   const handleDownloadReceipt = (order: Order) => {
     const printWindow = window.open('', '_blank', 'width=450,height=800');
     if (!printWindow) return;
-    const htmlContent = generateReceiptHtml(order);
+    const htmlContent = generateReceiptHtml(order, products);
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
@@ -1252,7 +1320,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       (order.customerPhone && order.customerPhone.includes(searchQuery));
     const matchesStatus = filterStatus === 'all' || order.status === filterStatus;
     const matchesProduct = filterProduct === 'all' || order.items.some(item => {
-      const info = getNormalizedProductInfo(item);
+      const info = getNormalizedProductInfo(item, products);
       return info.key === filterProduct;
     });
 
@@ -1719,13 +1787,15 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                         <td className="p-4">
                             <div className="text-xs text-gray-600">
                                 {order.items.map(i => {
-                                    const isAddon = Boolean(i.isCheckoutAddon);
-                                    const isCakenicTicket = i.collection === 'Cakenic Ticket' || i.collection === 'Event' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && (i.id.includes('cakenic') || i.id.includes('ticket')));
-                                    const isBlanket = !isCakenicTicket && (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket')));
+                                    const matched = getMatchedProduct(i, products);
+                                    const displayName = getItemDisplayName(i, products);
+                                    const isAddon = matched ? (Boolean(matched.isCheckoutAddon) || matched.category === 'Add-on') : Boolean(i.isCheckoutAddon);
+                                    const isCakenicTicket = (matched?.collection === 'Cakenic Ticket' || matched?.collection === 'Event' || matched?.category === 'Event Ticket' || Boolean(matched?.isCakenicOnly)) || i.collection === 'Cakenic Ticket' || i.collection === 'Event' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && (i.id.includes('cakenic') || i.id.includes('ticket')));
+                                    const isBlanket = !isCakenicTicket && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket'))));
                                     const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                                     return (
                                         <div key={i.id} className="mb-1.5 flex items-center gap-1 flex-wrap">
-                                            <span>{i.quantity}x {i.name}</span>
+                                            <span>{i.quantity}x {displayName}</span>
                                             {i.isPickedUp === true ? (
                                                 <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200 uppercase tracking-wider whitespace-nowrap">
                                                     🤝 Handed Over
@@ -1808,15 +1878,18 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                     </div>
                                     <div className="space-y-4">
                                     {order.items.map((item, idx) => {
-                                        const isAddon = Boolean(item.isCheckoutAddon);
-                                        const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
-                                        const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+                                        const matched = getMatchedProduct(item, products);
+                                        const displayName = getItemDisplayName(item, products);
+                                        const displayImage = getItemDisplayImage(item, products);
+                                        const isAddon = matched ? (Boolean(matched.isCheckoutAddon) || matched.category === 'Add-on') : Boolean(item.isCheckoutAddon);
+                                        const isCakenicTicket = (matched?.collection === 'Cakenic Ticket' || matched?.collection === 'Event' || matched?.category === 'Event Ticket' || Boolean(matched?.isCakenicOnly)) || item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
+                                        const isBlanket = !isCakenicTicket && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'))));
                                         const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                                         return (
                                             <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-[2px] border border-brand-latte/20">
-                                                <img src={item.image} className="w-12 h-16 object-cover bg-gray-100" />
+                                                <img src={displayImage} className="w-12 h-16 object-cover bg-gray-100" />
                                                 <div className="flex-1">
-                                                    <p className="font-serif text-gray-900 mb-1">{item.name}</p>
+                                                    <p className="font-serif text-gray-900 mb-1">{displayName}</p>
                                                     <span className={`inline-block text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded border mb-1 tracking-wider ${
                                                         isAddon 
                                                             ? 'bg-gray-100 text-gray-500 border-gray-200' 
@@ -2202,18 +2275,21 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                         <div className="bg-brand-grey/5 rounded-[2px] p-3 mb-3 border border-brand-latte/5 pl-4">
                                           <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">Items Ordered</p>
                                           <div className="divide-y divide-brand-latte/5 space-y-1.5">
-                                            {histOrder.items.map(item => (
-                                              <div key={item.id} className="flex justify-between text-xs text-gray-700 pt-1.5 first:pt-0">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="font-bold text-brand-flamingo">{item.quantity}x</span>
-                                                  <span>{item.name} {item.sizeOption ? `(${item.sizeOption})` : ''}</span>
-                                                  {item.isPreOrder && (
-                                                    <span className="text-[8px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">Pre-Order</span>
-                                                  )}
+                                            {histOrder.items.map(item => {
+                                              const displayName = getItemDisplayName(item, products);
+                                              return (
+                                                <div key={item.id} className="flex justify-between text-xs text-gray-700 pt-1.5 first:pt-0">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-brand-flamingo">{item.quantity}x</span>
+                                                    <span>{displayName}</span>
+                                                    {item.isPreOrder && (
+                                                      <span className="text-[8px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">Pre-Order</span>
+                                                    )}
+                                                  </div>
+                                                  <div className="font-mono text-gray-500">RM {((item.price || 0) * (item.quantity || 1)).toFixed(2)}</div>
                                                 </div>
-                                                <div className="font-mono text-gray-500">RM {((item.price || 0) * (item.quantity || 1)).toFixed(2)}</div>
-                                              </div>
-                                            ))}
+                                              );
+                                            })}
                                           </div>
                                         </div>
 
@@ -2422,10 +2498,10 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                         <p className="text-xs text-gray-400 italic py-4 text-center">No items in this order. Add items below.</p>
                       ) : (
                         editingOrder.items.map((item, idx) => (
-                          <div key={idx} className="flex gap-3 items-center bg-brand-grey/5 p-3 rounded border border-brand-latte/10 text-xs text-left">
-                            <img src={item.image} className="w-10 h-14 object-cover bg-gray-100 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-serif text-gray-900 font-bold truncate">{item.name}</p>
+                            <div key={idx} className="flex gap-3 items-center bg-brand-grey/5 p-3 rounded border border-brand-latte/10 text-xs text-left">
+                              <img src={getItemDisplayImage(item, products)} className="w-10 h-14 object-cover bg-gray-100 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-serif text-gray-900 font-bold truncate">{getItemDisplayName(item, products)}</p>
                               <p className="text-[10px] text-gray-500 font-semibold">RM {item.price}</p>
                               
                               {/* Special item toggles */}
