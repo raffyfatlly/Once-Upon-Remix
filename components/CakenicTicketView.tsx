@@ -234,7 +234,7 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
           <li>Bring 1 whole cake (minimum 8 inches, 100% Halal & Non-Alcoholic).</li>
           <li>Bring your picnic mat & cushions for comfortable outdoor seating.</li>
           <li>Present this Order No. (<strong>#{order.id}</strong>) or email at check-in counter.</li>
-          <li>Tickets are non-refundable and session-specific (non-transferable to future events; pass to a friend if unable to attend).</li>
+          <li>Tickets are non-refundable and valid only for your booked session.</li>
         </ul>
       </div>
 

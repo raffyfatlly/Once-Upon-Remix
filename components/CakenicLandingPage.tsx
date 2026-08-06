@@ -578,9 +578,9 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                     <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
                       <span className="text-base shrink-0">🎟️</span>
                       <div>
-                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Ticket = 1 Entry (Min Age 12+)</strong>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Ticket = 1 Entry (Age 12+)</strong>
                         <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Every participant requires a ticket to enter. For the safety & enjoyment of all, the minimum age is <strong>12 years old</strong>.
+                          Every participant needs a ticket to enter. Minimum age is <strong>12 years old</strong>.
                         </span>
                       </div>
                     </div>
@@ -590,7 +590,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                       <div>
                         <strong className="block text-[#332524] font-bold text-[11.5px]">1 Whole Uncut Cake Required</strong>
                         <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Each participant brings <strong>1 whole uncut cake</strong> (min 8 inches, 100% halal). Share your favorite creation with everyone!
+                          Each participant brings <strong>1 whole uncut cake</strong> (min. 8 inches, 100% halal) to place on the cake display table!
                         </span>
                       </div>
                     </div>
@@ -598,9 +598,9 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                     <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
                       <span className="text-base shrink-0">🎀</span>
                       <div>
-                        <strong className="block text-[#332524] font-bold text-[11.5px]">Wristband Check-In at Registration</strong>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">Check-In & Wristband</strong>
                         <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Simply present your registration info or <strong>Order No.</strong> upon arrival to receive your colored entry wristband.
+                          Present your <strong>Order No.</strong> or confirmation email at registration to collect your event wristband.
                         </span>
                       </div>
                     </div>
@@ -608,9 +608,9 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                     <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
                       <span className="text-base shrink-0">💌</span>
                       <div>
-                        <strong className="block text-[#332524] font-bold text-[11.5px]">Ticket Terms & Friendly Transfers</strong>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">Ticket Terms & Transfers</strong>
                         <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Tickets are non-refundable and valid strictly for the booked session (non-transferable to future events). If you cannot make it, you are welcome to gift or transfer your pass to a friend!
+                          Tickets are non-refundable and valid only for your booked session.
                         </span>
                       </div>
                     </div>
@@ -630,7 +630,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                   <ul className="space-y-2 text-[10.5px] text-[#332524]">
                     <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
                       <span className="text-sm shrink-0">🎂</span>
-                      <div><strong>1 Whole Cake (Uncut):</strong> Minimum 8 inches so there's enough to share.</div>
+                      <div><strong>1 Whole Cake (Uncut):</strong> Minimum 8 inches so there's plenty to share.</div>
                     </li>
                     <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
                       <span className="text-sm shrink-0">✨</span>
@@ -638,15 +638,15 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                     </li>
                     <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
                       <span className="text-sm shrink-0">💗</span>
-                      <div><strong>Any Flavor:</strong> Simple or dramatic! Don't worry about perfection.</div>
+                      <div><strong>Any Flavor:</strong> Home-baked or store-bought! Simple or fancy, all cakes are welcome.</div>
                     </li>
                     <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
                       <span className="text-sm shrink-0">☀️</span>
-                      <div><strong>No Ice Cream Cakes:</strong> Avoid cakes that melt easily outdoors.</div>
+                      <div><strong>Outdoor Friendly:</strong> Avoid ice cream cakes or delicate toppings that melt quickly outdoors.</div>
                     </li>
                     <li className="flex items-start gap-2 bg-white/65 backdrop-blur-md p-2.5 rounded-xl border border-[#E3A099]/40 text-[#8C5247] shadow-sm">
                       <span className="text-sm shrink-0">📦</span>
-                      <div><strong>Cake Box Provided:</strong> Cake boxes will be provided by us to collect your Cake Dash slices!</div>
+                      <div><strong>Cake Box Provided:</strong> Each participant receives a cake box to fill with your favorite cake slices during the Cake Dash!</div>
                     </li>
                   </ul>
                 </div>
@@ -674,7 +674,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>📩</span> 4:00 PM – 5:00 PM — Arrival & Registration
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Check in with your details. Receive colored entry wristband and enter private picnic zone.
+                        Check in, collect your entry wristband, and settle into the picnic zone.
                       </p>
                     </div>
 
@@ -687,7 +687,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>🧁</span> 5:00 PM — Cake Display & Setup (Event Start)
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Set up picnic spot (mat & cushions). Display your whole uncut cake on the shared table!
+                        Set up your picnic spot and place your cake on the cake display table!
                       </p>
                     </div>
 
@@ -700,7 +700,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>📸</span> 5:15 PM — Cake Viewing & Group Photo
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Browse all beautiful cake creations and snap group photos with new friends.
+                        Admire all the wonderful cakes and snap group photos with new friends!
                       </p>
                     </div>
 
@@ -710,10 +710,10 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         4
                       </div>
                       <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
-                        <span>🎂</span> 5:25 PM — Cake Dash (5 rounds)
+                        <span>🎂</span> 5:25 PM — Cake Dash (4-6 rounds)
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        5-6 mins per round! Collect delicious cake slices designated by wristband color groups.
+                        Bring your cake box to the table and pick your favorite cake slices!
                       </p>
                     </div>
 
@@ -726,7 +726,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>🩷</span> 6:00 PM — Games and Free Time
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Enjoy cake slices at your spot, socialize, and play fun picnic mini games!
+                        Enjoy your cake slices, chat with friends, and join in fun picnic mini games!
                       </p>
                     </div>
 
@@ -736,10 +736,10 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         6
                       </div>
                       <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
-                        <span>🏆</span> 6:30 PM — Awards
+                        <span>🏆</span> 6:30 PM — Awards: Best Outfit • Prettiest Cake • Cutest Picnic Setup
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Prize presentation for Best Outfit, Prettiest Cake & Cutest Picnic Setup!
+                        Celebrating our winners for Best Outfit, Prettiest Cake, and Cutest Picnic Setup!
                       </p>
                     </div>
 
@@ -752,7 +752,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>🎁</span> 6:50 PM — Gift Moments & Last Snaps
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Receive curated gift bags and capture final memories before sunset.
+                        Enjoy special gift moments and capture final memories before sunset!
                       </p>
                     </div>
 
@@ -765,7 +765,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         <span>🌷</span> 7:00 PM — End of Event
                       </div>
                       <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
-                        Wrap up a sweet and unforgettable Cakenic gathering!
+                        Wrap up a sweet and lovely afternoon together!
                       </p>
                     </div>
                   </div>
@@ -777,33 +777,46 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <div className="space-y-2.5 text-xs animate-fadeIn">
                   <div className="border-b border-[#332524]/15 pb-2">
                     <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
-                      <span>🌷</span> Picnic Setup & 3 Prize Categories
+                      <span>🌷</span> Picnic Setup & Prizes
                     </h3>
                   </div>
 
                   <div className="space-y-2.5 text-[10.5px] text-[#332524]">
                     <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
                       <div className="font-bold text-[#332524] flex items-center gap-1.5">
-                        <span>👗</span> Dress Code & Setup
+                        <span>👗</span> Dress Code & Themes
                       </div>
                       <p className="text-[#523A36] leading-relaxed font-medium">
-                        Pastels, florals, cottagecore, ribbons & sun hats! Bring your picnic mat & cushions to sit comfortably.
+                        Dress up in your prettiest outfit! Soft pastels, florals, cottagecore, ribbons, or sun hats are all welcome.
+                      </p>
+                      <div className="pt-1.5 space-y-1 text-[10.5px] text-[#7A3E34] bg-white/40 p-2 rounded-lg border border-white/50">
+                        <div>🌸 <strong>Putrajaya:</strong> European Classical Theme</div>
+                        <div>🌿 <strong>Johor:</strong> Rocco Garden Theme</div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
+                      <div className="font-bold text-[#332524] flex items-center gap-1.5">
+                        <span>🧺</span> Picnic Setup & Best Setup Award
+                      </div>
+                      <p className="text-[#523A36] leading-relaxed font-medium">
+                        Bring your favorite picnic mat, cushions, and cute decorations to create a cozy spot. Feel free to use your creativity—the best setup will win a special prize! 🏆
                       </p>
                     </div>
 
                     <div className="bg-white/60 backdrop-blur-md p-3 rounded-xl border border-white/70 shadow-sm space-y-1.5">
                       <div className="font-bold text-[#8C5247] flex items-center gap-1.5 text-[11.5px]">
-                        <span>🏆</span> 3 Distinct Prize Categories
+                        <span>🏆</span> 3 Prize Categories
                       </div>
                       <div className="grid grid-cols-1 gap-1.5 text-[#523A36] text-[10.5px]">
                         <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
-                          <span>👗</span> <span><strong>1. Best Outfit Award:</strong> Most stylish picnic ensemble</span>
+                          <span>👗</span> <span><strong>1. Best Outfit Award:</strong> Prettiest picnic outfit</span>
                         </div>
                         <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
-                          <span>🎂</span> <span><strong>2. Prettiest Cake Award:</strong> Best decorated cake creation</span>
+                          <span>🎂</span> <span><strong>2. Prettiest Cake Award:</strong> Most beautiful cake decoration</span>
                         </div>
                         <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
-                          <span>🧺</span> <span><strong>3. Cutest Picnic Setup Award:</strong> Most charming and adorable picnic setup</span>
+                          <span>🧺</span> <span><strong>3. Cutest Picnic Setup Award:</strong> Most creative and cozy picnic spot</span>
                         </div>
                       </div>
                     </div>
@@ -816,26 +829,26 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <div className="space-y-2.5 text-xs animate-fadeIn">
                   <div className="border-b border-[#332524]/15 pb-2">
                     <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
-                      <span>☔</span> Rain Plan & Ticket Policy
+                      <span>☔</span> Weather Plan & Ticket Policy
                     </h3>
                   </div>
 
                   <div className="space-y-2 text-[10.5px] text-[#332524]">
                     <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
                       <div className="font-bold text-[#332524] flex items-center gap-1.5">
-                        <span>☔</span> Rain Plan
+                        <span>☔</span> Weather Plan
                       </div>
                       <p className="text-[#523A36] leading-relaxed font-medium">
-                        In case of rain, outdoor activities will pause temporarily until weather clears so we can safely continue.
+                        In case of light rain, activities will pause until the weather clears so we can safely resume our fun together!
                       </p>
                     </div>
 
                     <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
                       <div className="font-bold text-[#332524] flex items-center gap-1.5">
-                        <span>🌧️</span> All-Day Rain & Refund Policy
+                        <span>🌧️</span> Refund & Cancellation Policy
                       </div>
                       <p className="text-[#523A36] leading-relaxed font-medium">
-                        If severe weather persists throughout the entire scheduled event duration, please note that tickets remain non-refundable as venue permits, custom decor, and gift bag allocations are prepared in advance. We deeply appreciate your kind understanding and support!
+                        If heavy rain continues throughout the event, tickets remain non-refundable as venue permits, table setups, custom decor, and goodie bags are prepared in advance. Thank you so much for your kind understanding and warm support!
                       </p>
                     </div>
                   </div>
@@ -904,7 +917,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <span>Can I bring non-ticketed friends or kids?</span>
               </h4>
               <p className="text-white/95 text-xs pl-5 leading-snug">
-                Only guests with a valid ticket can enter the designated Cakenic zone area (ages 12+). Non-ticketed friends or family members are welcome to enjoy the surrounding public park area, but only ticket holders can enter the Cakenic picnic zone.
+                Only participants with a valid ticket can enter the designated Cakenic zone area (ages 12+). Non-ticketed friends or family members are welcome to enjoy the surrounding public park area, but only ticket holders can enter the Cakenic picnic zone.
               </p>
             </div>
 
