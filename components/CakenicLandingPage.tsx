@@ -86,7 +86,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
         return {
           ...loc,
           price: typeof matched.price === 'number' ? matched.price : loc.price,
-          availableSlots: matched.stock !== undefined ? matched.stock : loc.availableSlots,
+          availableSlots: matched.stock !== undefined ? Number(matched.stock) : loc.availableSlots,
           description: matched.description || loc.description
         };
       }
@@ -180,6 +180,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
   const [activeGuidelineTab, setActiveGuidelineTab] = useState<'essentials' | 'flow' | 'cake' | 'picnic' | 'policy'>('essentials');
 
   const handleOpenCheckout = (ticket: CakenicLocationTicket) => {
+    if (ticket.availableSlots <= 0) return;
     setSelectedTicket(ticket);
     setTicketQuantity(1);
     setCheckoutError('');
@@ -189,6 +190,11 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTicket) return;
+
+    if (selectedTicket.availableSlots <= 0) {
+      setCheckoutError('Sorry, this location ticket is currently sold out.');
+      return;
+    }
 
     if (!customerName || !customerEmail || !customerPhone) {
       setCheckoutError('Please fill in your full name, email, and phone number.');
@@ -383,7 +389,11 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
             {locations.map((loc) => (
               <div
                 key={loc.id}
-                onClick={() => handleOpenCheckout(loc)}
+                onClick={() => {
+                  if (loc.availableSlots > 0) {
+                    handleOpenCheckout(loc);
+                  }
+                }}
                 className="group bg-gradient-to-b from-[#FFFDFB] via-[#FBF5EE] to-[#F1E5DA] rounded-3xl p-3 sm:p-4 shadow-[inset_0_1.5px_0_0_rgba(255,255,255,0.95),inset_0_-3.5px_0_0_rgba(200,165,150,0.45),0_14px_32px_rgba(95,50,35,0.13)] hover:shadow-[inset_0_1.5px_0_0_rgba(255,255,255,1),inset_0_-4px_0_0_rgba(180,140,120,0.55),0_18px_40px_rgba(95,50,35,0.18)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col items-center justify-between text-center gap-2 sm:gap-2.5"
               >
                 {/* 1. TOP ELEMENT: CUTE CLEAN DATE BADGE */}
@@ -407,22 +417,38 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                   <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
                     RM {loc.price}
                   </div>
-                  <div className="bg-[#8C5247]/10 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-[#8C5247]/15">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse shrink-0" />
-                    <span>{loc.availableSlots} tickets left</span>
-                  </div>
+                  {loc.availableSlots <= 0 ? (
+                    <div className="bg-red-100 text-red-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-red-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                      <span>Sold Out</span>
+                    </div>
+                  ) : (
+                    <div className="bg-[#8C5247]/10 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-[#8C5247]/15">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse shrink-0" />
+                      <span>{loc.availableSlots} tickets left</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* 4. BUTTON WITH LIGHT SAGE GREEN HOVER rgb(197, 221, 216) */}
+                {/* 4. BUTTON */}
                 <button 
+                  disabled={loc.availableSlots <= 0}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleOpenCheckout(loc);
+                    if (loc.availableSlots > 0) {
+                      handleOpenCheckout(loc);
+                    }
                   }}
-                  className="w-full bg-[#E3A099] group-hover:bg-[#C5DDD8] group-hover:text-[#332524] text-white py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-sans font-medium transition-all duration-300 shadow-[0_3px_10px_rgba(227,160,153,0.35)] flex items-center justify-center gap-1"
+                  className={`w-full py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-sans font-medium transition-all duration-300 flex items-center justify-center gap-1 ${
+                    loc.availableSlots <= 0
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
+                      : 'bg-[#E3A099] group-hover:bg-[#C5DDD8] group-hover:text-[#332524] text-white shadow-[0_3px_10px_rgba(227,160,153,0.35)]'
+                  }`}
                 >
-                  <span>Get Ticket</span>
-                  <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                  <span>{loc.availableSlots <= 0 ? 'Sold Out' : 'Get Ticket'}</span>
+                  {loc.availableSlots > 0 && (
+                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                  )}
                 </button>
               </div>
             ))}
@@ -1110,10 +1136,17 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
               
               <div className="flex justify-between items-center">
                 <span className="font-medium text-[#6B5450]">Tickets Remaining:</span>
-                <span className="font-bold text-[#8C5247] bg-[#8C5247]/10 px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border border-[#8C5247]/15">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse" />
-                  <span>{selectedTicket.availableSlots} left</span>
-                </span>
+                {selectedTicket.availableSlots <= 0 ? (
+                  <span className="font-bold text-red-700 bg-red-100 px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border border-red-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    <span>Sold Out</span>
+                  </span>
+                ) : (
+                  <span className="font-bold text-[#8C5247] bg-[#8C5247]/10 px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border border-[#8C5247]/15">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse" />
+                    <span>{selectedTicket.availableSlots} left</span>
+                  </span>
+                )}
               </div>
 
               <div className="flex justify-between items-center">
@@ -1241,14 +1274,16 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
               <div className="pt-3 space-y-2.5">
                 <button
                   type="submit"
-                  disabled={isProcessing}
-                  className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-4 px-6 rounded-full font-bold text-xs sm:text-sm tracking-widest uppercase transition-all duration-300 shadow-[0_8px_24px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2.5 disabled:opacity-50"
+                  disabled={isProcessing || selectedTicket.availableSlots <= 0}
+                  className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-4 px-6 rounded-full font-bold text-xs sm:text-sm tracking-widest uppercase transition-all duration-300 shadow-[0_8px_24px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isProcessing ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
                       <span>Connecting CHIP Payment Gateway...</span>
                     </>
+                  ) : selectedTicket.availableSlots <= 0 ? (
+                    <span>Sold Out</span>
                   ) : (
                     <>
                       <ShieldCheck size={18} />
