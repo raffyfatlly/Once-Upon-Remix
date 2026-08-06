@@ -14,6 +14,24 @@ async function startServer() {
   app.use(express.json());
 
   // ---------------------------------------------------------------------------
+  // CAKENIC CLEAN URL SERVER-SIDE REDIRECT HANDLER (/cakenic, /cakenic-event)
+  // Performs a 302 HTTP redirect from clean path /cakenic to hash route /#/cakenic
+  // for Instagram bio links and direct browser access.
+  // ---------------------------------------------------------------------------
+  app.get(['/cakenic', '/cakenic/*splat', '/cakenic-event', '/cakenic-event/*splat'], (req, res) => {
+    const originalUrl = req.originalUrl || req.url;
+    const queryIndex = originalUrl.indexOf('?');
+    const pathPart = queryIndex !== -1 ? originalUrl.substring(0, queryIndex) : originalUrl;
+    const queryPart = queryIndex !== -1 ? originalUrl.substring(queryIndex) : '';
+
+    let cleanPath = pathPart.replace(/\/+$/, '');
+    if (!cleanPath) cleanPath = '/cakenic';
+
+    console.log(`[HTTP 302 Redirect] ${originalUrl} -> /#${cleanPath}${queryPart}`);
+    return res.redirect(302, `/#${cleanPath}${queryPart}`);
+  });
+
+  // ---------------------------------------------------------------------------
   // SHORT LINK SERVER-SIDE REDIRECT HANDLER (/l/:shortCode)
   // Performs a 302 HTTP redirect to the full tagged destination URL.
   // Merges any incoming query parameters with the destination's query parameters.

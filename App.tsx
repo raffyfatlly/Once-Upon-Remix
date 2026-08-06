@@ -831,7 +831,19 @@ const App: React.FC = () => {
             products={products}
           />
         } />
+        <Route path="/cakenic/*" element={
+          <CakenicLandingPage 
+            onAddToCart={handleAddToCart}
+            products={products}
+          />
+        } />
         <Route path="/cakenic-event" element={
+          <CakenicLandingPage 
+            onAddToCart={handleAddToCart}
+            products={products}
+          />
+        } />
+        <Route path="/cakenic-event/*" element={
           <CakenicLandingPage 
             onAddToCart={handleAddToCart}
             products={products}
