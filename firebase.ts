@@ -145,7 +145,7 @@ export const createOrderInDb = async (orderData: Omit<Order, 'id'>) => {
           price: itemInfo?.price || 0,
           stock: 50 - requestedItem.qty,
           category: itemInfo?.category || 'Event Ticket',
-          collection: itemInfo?.collection || 'Cakenic 2026',
+          collection: itemInfo?.collection || 'Cakenic Ticket',
           image: itemInfo?.image || ''
         });
       }
@@ -349,6 +349,46 @@ export const updateOrderStatusInDb = async (id: string, status: Order['status'])
     status,
     statusHistory: arrayUnion({ status, timestamp: new Date().toISOString() })
   });
+};
+
+export const searchCakenicOrder = async (email?: string, phone?: string, orderId?: string): Promise<Order[]> => {
+  if (!db) return [];
+  try {
+    if (orderId && orderId.trim()) {
+      const order = await getOrderById(orderId.trim());
+      if (order) return [order];
+    }
+
+    const q = query(collection(db, 'orders'), orderBy('date', 'desc'), limit(150));
+    const snapshot = await getDocs(q);
+    const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+
+    const cleanInputEmail = (email || '').toLowerCase().trim();
+    const cleanInputPhone = (phone || '').replace(/[^\d]/g, '');
+    const cleanOrderId = (orderId || '').trim();
+
+    return allOrders.filter(order => {
+      const isCakenic = order.source === 'cakenic' || 
+        order.channel === 'Cakenic Sales' || 
+        order.utm_source === 'cakenic_landing_page' ||
+        (order.shippingAddress && order.shippingAddress.toLowerCase().trim() === 'cakenic') ||
+        order.items?.some(i => i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic')));
+      
+      if (!isCakenic) return false;
+
+      const orderEmail = (order.customerEmail || '').toLowerCase().trim();
+      const orderPhone = (order.customerPhone || '').replace(/[^\d]/g, '');
+
+      if (cleanOrderId && order.id === cleanOrderId) return true;
+      if (cleanInputEmail && orderEmail.includes(cleanInputEmail)) return true;
+      if (cleanInputPhone && cleanInputPhone.length >= 4 && (orderPhone.includes(cleanInputPhone) || cleanInputPhone.includes(orderPhone))) return true;
+
+      return false;
+    });
+  } catch (e) {
+    console.error("Ticket search error:", e);
+    return [];
+  }
 };
 
 export const updateOrderNotesInDb = async (id: string, adminNotes: string) => {

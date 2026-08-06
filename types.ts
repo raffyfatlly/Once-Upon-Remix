@@ -54,7 +54,8 @@ export interface Order {
   giftMessage?: string;
   adminNotes?: string;
   statusHistory?: { status: string; timestamp: string }[];
-  source?: 'online' | 'pos';
+  source?: 'online' | 'pos' | 'cakenic';
+  channel?: string;
   paymentMethod?: 'bank_transfer' | 'qr' | 'online';
   trackingNumber?: string;
   promoCode?: string;

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Instagram, Heart, Lock, MessageCircle, Sparkles } from 'lucide-react';
+import { Instagram, Heart, Lock, MessageCircle, Cake } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface FooterProps {
@@ -79,16 +79,27 @@ export const Footer: React.FC<FooterProps> = ({ onAdminClick }) => {
             Designed with Love
           </p>
           
-          {/* Subtle Admin Icon */}
-          {onAdminClick && (
-            <button 
-              onClick={onAdminClick}
-              className="text-brand-latte/30 hover:text-brand-gold transition-colors p-2"
-              aria-label="Admin Access"
+          {/* Subtle Footnote Actions */}
+          <div className="flex items-center justify-center gap-3">
+            <Link 
+              to="/cakenic" 
+              className="text-brand-latte/40 hover:text-brand-flamingo transition-colors p-2"
+              title="Cakenic 2026 Event"
+              aria-label="Cakenic Landing Page"
             >
-              <Lock size={12} />
-            </button>
-          )}
+              <Cake size={14} />
+            </Link>
+
+            {onAdminClick && (
+              <button 
+                onClick={onAdminClick}
+                className="text-brand-latte/30 hover:text-brand-gold transition-colors p-2"
+                aria-label="Admin Access"
+              >
+                <Lock size={12} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </footer>

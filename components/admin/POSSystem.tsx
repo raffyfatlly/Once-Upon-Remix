@@ -385,8 +385,9 @@ export const generateReceiptHtml = (order: Order): string => {
           <tbody>
             ${order.items.map(item => {
               const isAddon = Boolean(item.isCheckoutAddon);
-              const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
-              const itemCollection = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+              const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && item.id.startsWith('cakenic'));
+              const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+              const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket' : 'Swaddle'));
               const fulfillmentStatus = order.source === 'pos' ? (item.isPickedUp !== false ? 'Handed Over In-store' : 'To Pack & Ship') : 'To Pack & Ship';
               return `
                 <tr>
@@ -674,7 +675,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
            category.includes('add-on') || 
            category.includes('addon');
   };
-  const isBlanketProduct = (p: Product) => !p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'));
+  const isCakenicTicketProduct = (p: Product | CartItem) => p.collection === 'Cakenic Ticket' || p.category === 'Event Ticket' || Boolean(p.isCakenicOnly) || (p.id && p.id.startsWith('cakenic'));
+  const isBlanketProduct = (p: Product | CartItem) => !isCakenicTicketProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
 
   const swaddles = products.filter(p => !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
   const blankets = products.filter(p => !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);

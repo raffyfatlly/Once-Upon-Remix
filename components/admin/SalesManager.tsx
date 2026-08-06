@@ -29,6 +29,22 @@ const formatKLTime = (dateString: string) => {
   });
 };
 
+export const getOrderChannel = (order: Order): 'pos' | 'cakenic' | 'online' => {
+  if (
+    order.source === 'cakenic' || 
+    order.channel === 'Cakenic Sales' || 
+    order.utm_source === 'cakenic_landing_page' || 
+    (order.shippingAddress && order.shippingAddress.toLowerCase().trim() === 'cakenic') ||
+    order.items?.some(i => i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic')))
+  ) {
+    return 'cakenic';
+  }
+  if (order.source === 'pos' || order.channel === 'POS Sales') {
+    return 'pos';
+  }
+  return 'online';
+};
+
 const hasManualNote = (order: Order) => {
   if (order.giftMessage && order.giftMessage.trim().length > 0) {
     return true;
@@ -461,7 +477,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     totalOrders: number;
     totalSpend: number;
     lastOrderDate: string;
-    sources: Set<'pos' | 'online'>;
+    sources: Set<'pos' | 'online' | 'cakenic'>;
     countries: Set<'malaysia' | 'singapore'>;
     orders: Order[];
   }
@@ -471,7 +487,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     
     orders.forEach(order => {
       const key = (order.customerEmail || order.customerName || 'anonymous').toLowerCase().trim();
-      const orderSource = order.source === 'pos' ? 'pos' : 'online';
+      const orderSource = getOrderChannel(order);
       const orderCountry = (order.shippingAddress && order.shippingAddress.toLowerCase().includes('singapore')) ? 'singapore' : 'malaysia';
       
       const existing = customerMap.get(key);
@@ -521,7 +537,8 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       
       const matchesSource = filterSource === 'all' || 
         (filterSource === 'pos' && cust.sources.has('pos')) || 
-        (filterSource === 'online' && cust.sources.has('online'));
+        (filterSource === 'online' && cust.sources.has('online')) ||
+        (filterSource === 'cakenic' && cust.sources.has('cakenic'));
         
       const matchesCountry = filterCountry === 'all' || cust.countries.has(filterCountry as any);
         
@@ -547,17 +564,20 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     let totalSpend = 0;
     let onlineCount = 0;
     let posCount = 0;
+    let cakenicCount = 0;
     customersList.forEach(c => {
       totalSpend += c.totalSpend;
       if (c.sources.has('online')) onlineCount++;
       if (c.sources.has('pos')) posCount++;
+      if (c.sources.has('cakenic')) cakenicCount++;
     });
     const avgLtv = customersList.length > 0 ? totalSpend / customersList.length : 0;
     return {
       totalCustomers: customersList.length,
       avgLtv,
       onlineCount,
-      posCount
+      posCount,
+      cakenicCount
     };
   }, [customersList]);
 
@@ -1253,9 +1273,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       }
     }
 
+    const orderChannel = getOrderChannel(order);
     const matchesSource = filterSource === 'all' || 
-      (filterSource === 'pos' && order.source === 'pos') || 
-      (filterSource === 'online' && order.source !== 'pos');
+      (filterSource === 'pos' && orderChannel === 'pos') || 
+      (filterSource === 'online' && orderChannel === 'online') ||
+      (filterSource === 'cakenic' && orderChannel === 'cakenic');
 
     const isSingapore = order.shippingAddress ? order.shippingAddress.toLowerCase().includes('singapore') : false;
     const matchesCountry = filterCountry === 'all' || 
@@ -1519,10 +1541,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
 
               {/* Source/Channel Selector - For Both Tabs */}
               <div className="relative">
-                <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="appearance-none bg-white border border-brand-latte/30 px-4 py-3 pr-10 rounded-[2px] text-xs font-bold uppercase tracking-widest focus:outline-none focus:border-brand-flamingo text-gray-600 w-full lg:w-44">
+                <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)} className="appearance-none bg-white border border-brand-latte/30 px-4 py-3 pr-10 rounded-[2px] text-xs font-bold uppercase tracking-widest focus:outline-none focus:border-brand-flamingo text-gray-600 w-full lg:w-48">
                     <option value="all">All Channels</option>
                     <option value="online">Online Sales</option>
                     <option value="pos">POS Sales Only</option>
+                    <option value="cakenic">Cakenic Sales</option>
                 </select>
                 <Store size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -1667,8 +1690,14 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                             <div className="flex flex-col mt-1.5 gap-0.5">
                                 <div className="flex items-center gap-1.5 text-xs text-gray-500" title="Order Date"><Calendar size={12} /> {formatKLDate(order.date)}</div>
                                 <div className="flex items-center gap-1.5 text-xs text-gray-400" title="Order Time"><Clock size={12} /> {formatKLTime(order.date)}</div>
-                                {order.source === 'pos' && (
-                                  <div className="mt-1 bg-brand-flamingo/10 text-brand-flamingo text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-brand-flamingo/20">POS</div>
+                                {getOrderChannel(order) === 'pos' && (
+                                  <div className="mt-1 bg-amber-50 text-amber-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-amber-200">POS Sales</div>
+                                )}
+                                {getOrderChannel(order) === 'cakenic' && (
+                                  <div className="mt-1 bg-rose-100 text-rose-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-rose-300">Cakenic Sales</div>
+                                )}
+                                {getOrderChannel(order) === 'online' && (
+                                  <div className="mt-1 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-blue-200">Online Sales</div>
                                 )}
                                 {shippedDateStr && (
                                   <div className="mt-1.5 pt-1.5 border-t border-dashed border-brand-latte/20">
@@ -1690,8 +1719,9 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                             <div className="text-xs text-gray-600">
                                 {order.items.map(i => {
                                     const isAddon = Boolean(i.isCheckoutAddon);
-                                    const isBlanket = !i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket'));
-                                    const itemCollection = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+                                    const isCakenicTicket = i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic'));
+                                    const isBlanket = !isCakenicTicket && (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket')));
+                                    const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket' : 'Swaddle'));
                                     return (
                                         <div key={i.id} className="mb-1.5 flex items-center gap-1 flex-wrap">
                                             <span>{i.quantity}x {i.name}</span>
@@ -1699,7 +1729,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                                 <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200 uppercase tracking-wider whitespace-nowrap">
                                                     🤝 Handed Over
                                                 </span>
-                                            ) : order.source === 'pos' ? (
+                                            ) : getOrderChannel(order) === 'pos' ? (
                                                 <span className="text-[8px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200 uppercase tracking-wider whitespace-nowrap">
                                                     📦 To Pack
                                                 </span>
@@ -1707,9 +1737,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                             <span className={`text-[8px] font-sans font-bold uppercase px-1.5 py-0.5 rounded border whitespace-nowrap ${
                                                 isAddon 
                                                     ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                                                    : isBlanket 
-                                                        ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                                                        : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                                                    : isCakenicTicket
+                                                        ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
+                                                        : isBlanket 
+                                                            ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                                            : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                                             }`}>
                                                 {itemCollection}
                                             </span>
@@ -1776,8 +1808,9 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                     <div className="space-y-4">
                                     {order.items.map((item, idx) => {
                                         const isAddon = Boolean(item.isCheckoutAddon);
-                                        const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
-                                        const itemCollection = isAddon ? 'Add-on' : (isBlanket ? 'Blanket Collection' : 'Swaddle Collection');
+                                        const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && item.id.startsWith('cakenic'));
+                                        const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+                                        const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket Collection' : 'Swaddle Collection'));
                                         return (
                                             <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-[2px] border border-brand-latte/20">
                                                 <img src={item.image} className="w-12 h-16 object-cover bg-gray-100" />
@@ -1786,9 +1819,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                                     <span className={`inline-block text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded border mb-1 tracking-wider ${
                                                         isAddon 
                                                             ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                                                            : isBlanket 
-                                                                ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                                                                : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                                                            : isCakenicTicket
+                                                                ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
+                                                                : isBlanket 
+                                                                    ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                                                    : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                                                     }`}>
                                                         {itemCollection}
                                                     </span>

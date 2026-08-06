@@ -214,16 +214,16 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         description: 'Join us under the lush trees of Putrajaya for an unforgettable afternoon of cake sharing, picnic vibes, and sweet memories. Secret Garden Park, Putrajaya.',
         image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
-        collection: 'Cakenic 2026',
+        collection: 'Cakenic Ticket',
         stock: 45
       },
       {
         name: 'Cakenic Johor Bahru',
-        price: 88,
+        price: 2,
         description: 'An exclusive Southern Cakenic gathering featuring curated gift bags, prizes, and a dream botanical picnic setting. Eco Spring Botanic Garden, JB.',
         image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
-        collection: 'Cakenic 2026',
+        collection: 'Cakenic Ticket',
         stock: 30
       }
     ];

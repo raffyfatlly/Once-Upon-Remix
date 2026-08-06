@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Play, Pause, Volume2, VolumeX, Calendar, Clock, MapPin, Sparkles, 
   Check, Ticket, ChevronDown, ShieldCheck, Heart, ArrowRight, X, 
   Coffee, Gift, AlertCircle, Loader2, Info, Share2, HelpCircle,
   AlertTriangle, Sun, Award, Users, Camera, Home, FileText, ShoppingBag,
-  CheckCircle2
+  CheckCircle2, Search, Mail, Phone, KeyRound
 } from 'lucide-react';
-import { CartItem, Product } from '../types';
-import { createOrderInDb } from '../firebase';
+import { CartItem, Product, Order } from '../types';
+import { createOrderInDb, searchCakenicOrder } from '../firebase';
 import { getAttribution } from '../analytics';
+import { CakenicTicketView } from './CakenicTicketView';
 
 interface CakenicLandingPageProps {
   onAddToCart?: (product: Product, quantity: number) => void;
@@ -21,6 +22,8 @@ export interface CakenicLocationTicket {
   location: string;
   city: string;
   venue: string;
+  fullAddress?: string;
+  theme?: string;
   date: string;
   time: string;
   price: number;
@@ -36,33 +39,38 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     id: 'cakenic-ticket-putrajaya',
     location: 'Cakenic Putrajaya',
     city: 'Putrajaya',
-    venue: 'Secret Garden Park, Putrajaya',
-    date: 'Saturday, October 17, 2026',
-    time: '3:00 PM – 6:30 PM',
+    venue: 'Taman Botani, Putrajaya',
+    fullAddress: 'Taman Botani Putrajaya, Presint 1, 62000 Putrajaya',
+    theme: 'European Classical',
+    date: 'Saturday, September 12, 2026',
+    time: '4:00 PM – 7:00 PM',
     price: 68,
     badge: 'Popular Location',
     image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
     availableSlots: 45,
-    description: 'Join us under the lush trees of Putrajaya for an unforgettable afternoon of cake sharing, picnic vibes, and sweet memories.'
+    description: 'Join us at Taman Botani Putrajaya for an elegant European Classical themed afternoon of cake sharing, picnic vibes, and sweet memories.'
   },
   {
     id: 'cakenic-ticket-johor',
-    location: 'Cakenic Johor Bahru',
-    city: 'Johor Bahru',
-    venue: 'Eco Spring Botanic Garden, JB',
+    location: 'Cakenic JOHOR',
+    city: 'JOHOR',
+    venue: 'Eco Spring Garden, Johor',
+    fullAddress: 'Eco Spring Garden, Jalan Ekoflora 1, Taman Ekoflora, 81100 Johor Bahru, Johor',
+    theme: 'Rocco Garden',
     date: 'Saturday, October 24, 2026',
-    time: '3:00 PM – 6:30 PM',
+    time: '4:00 PM – 7:00 PM',
     price: 88,
     badge: 'Limited Spots',
     popular: true,
     image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
     availableSlots: 30,
-    description: 'An exclusive Southern Cakenic gathering featuring curated gift bags, prizes, and a dream botanical picnic setting.'
+    description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden with a grand Rocco Garden theme, featuring curated gift bags, prizes, and a dream botanical picnic setting.'
   }
 ];
 
 export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToCart }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Selected Ticket & Checkout Drawer State
   const [selectedTicket, setSelectedTicket] = useState<CakenicLocationTicket | null>(null);
@@ -81,8 +89,73 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
   const [checkoutError, setCheckoutError] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Active Tab for Must-Read Guidelines
-  const [activeGuidelineTab, setActiveGuidelineTab] = useState<'venue' | 'cake' | 'setup' | 'weather' | 'attire' | null>(null);
+  // Ticket Lookup State
+  const [lookupEmail, setLookupEmail] = useState('');
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupOrderId, setLookupOrderId] = useState('');
+  const [isSearchingTicket, setIsSearchingTicket] = useState(false);
+  const [lookupError, setLookupError] = useState('');
+  const [foundOrders, setFoundOrders] = useState<Order[]>([]);
+  const [selectedOrderForView, setSelectedOrderForView] = useState<Order | null>(null);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+
+  // Auto-search ticket if order param exists in URL (e.g. ?ticket=1042)
+  useEffect(() => {
+    const ticketParam = searchParams.get('ticket') || searchParams.get('order');
+    if (ticketParam) {
+      setLookupOrderId(ticketParam);
+      setIsSearchingTicket(true);
+      searchCakenicOrder(undefined, undefined, ticketParam).then(orders => {
+        setIsSearchingTicket(false);
+        if (orders.length > 0) {
+          setFoundOrders(orders);
+          setSelectedOrderForView(orders[0]);
+          setShowTicketModal(true);
+        }
+      }).catch(err => {
+        setIsSearchingTicket(false);
+      });
+    }
+  }, [searchParams]);
+
+  const handleLookupTicket = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLookupError('');
+    setFoundOrders([]);
+    setSelectedOrderForView(null);
+
+    const trimmedEmail = lookupEmail.trim();
+    const trimmedPhone = lookupPhone.trim();
+    const trimmedOrderId = lookupOrderId.trim();
+
+    if (!trimmedEmail && !trimmedPhone && !trimmedOrderId) {
+      setLookupError('Please enter your Email Address or Phone Number to find your ticket.');
+      return;
+    }
+
+    setIsSearchingTicket(true);
+
+    try {
+      const results = await searchCakenicOrder(trimmedEmail, trimmedPhone, trimmedOrderId);
+      setIsSearchingTicket(false);
+
+      if (results.length === 0) {
+        setLookupError('No Cakenic ticket found for those details. Please check your email address or phone number.');
+      } else if (results.length === 1) {
+        setFoundOrders(results);
+        setSelectedOrderForView(results[0]);
+        setShowTicketModal(true);
+      } else {
+        setFoundOrders(results);
+      }
+    } catch (err: any) {
+      setIsSearchingTicket(false);
+      setLookupError('Failed to search tickets. Please try again.');
+    }
+  };
+
+  // Active Tab for Navigation Style Guidelines
+  const [activeGuidelineTab, setActiveGuidelineTab] = useState<'essentials' | 'flow' | 'cake' | 'picnic' | 'policy'>('essentials');
 
   const handleOpenCheckout = (ticket: CakenicLocationTicket) => {
     setSelectedTicket(ticket);
@@ -120,7 +193,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
       description: `${selectedTicket.date} @ ${selectedTicket.venue} | Guest: ${customerName} (IG: ${instagramHandle || 'N/A'})`,
       image: selectedTicket.image,
       category: 'Event Ticket',
-      collection: 'Cakenic 2026'
+      collection: 'Cakenic Ticket'
     };
 
     const totalAmount = selectedTicket.price * ticketQuantity;
@@ -137,8 +210,10 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
         total: totalAmount,
         status: 'pending',
         date: new Date().toISOString(),
-        shippingAddress: `CAKENIC TICKET E-DELIVERY | Event Location: ${selectedTicket.location} | IG: ${instagramHandle || 'N/A'} | Cake Info: ${cakeFlavor || 'To be decided'}`,
-        adminNotes: `CAKENIC PASS ORDER (CHIP). Qty: ${ticketQuantity}. IG: ${instagramHandle}. Cake: ${cakeFlavor}`,
+        shippingAddress: 'Cakenic',
+        adminNotes: '',
+        source: 'cakenic',
+        channel: 'Cakenic Sales',
         utm_source: 'cakenic_landing_page',
         utm_medium: attribution.first_utm_medium || 'direct',
         utm_campaign: 'cakenic_event_2026'
@@ -292,13 +367,18 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 {/* 1. TOP ELEMENT: CUTE CLEAN DATE BADGE */}
                 <span className="bg-[#FAF0EC]/90 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8),inset_0_-1px_0_0_rgba(215,180,165,0.25)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <Calendar size={10} className="text-[#E3A099]" />
-                  <span>{loc.city === 'Putrajaya' ? '17 Oct 2026' : '24 Oct 2026'}</span>
+                  <span>{loc.city === 'Putrajaya' ? '12 Sep 2026' : '24 Oct 2026'}</span>
                 </span>
 
-                {/* 2. CITY TITLE IN ALL CAPS */}
-                <h2 className="font-serif text-base sm:text-xl font-normal text-[#2C1D1C] group-hover:text-[#8C5247] transition-colors tracking-widest leading-tight uppercase">
-                  {loc.city}
-                </h2>
+                {/* 2. CITY TITLE IN ALL CAPS & THEME */}
+                <div className="space-y-0.5">
+                  <h2 className="font-display font-extrabold text-base sm:text-xl text-[#2C1D1C] group-hover:text-[#8C5247] transition-colors tracking-[0.18em] leading-tight uppercase">
+                    {loc.city}
+                  </h2>
+                  <p className="font-serif italic text-[11px] sm:text-xs text-[#8C5247] font-medium tracking-wide">
+                    {loc.theme}
+                  </p>
+                </div>
 
                 {/* 3. PRICE TAG */}
                 <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
@@ -358,13 +438,13 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
 
       </section>
 
-      {/* --- CAKENIC GUIDELINES SECTION WITH 9:16 ASPECT RATIO FRAME --- */}
+      {/* --- CAKENIC GUIDELINES & EVENT FLOW SECTION WITH TALLER FRAME & GLASS PILL NAVIGATION --- */}
       <section id="guidelines" className="py-12 px-3 sm:px-4 flex flex-col items-center justify-center relative z-20">
         
-        {/* Frame container holding the background artwork cleanly with 9:16 ASPECT RATIO */}
-        <div className="relative w-full max-w-[350px] sm:max-w-[400px] aspect-[9/16] rounded-[36px] sm:rounded-[44px] overflow-hidden shadow-[0_20px_50px_rgba(70,40,30,0.18)] border border-white/80 flex flex-col justify-between p-4 sm:p-5">
+        {/* Longer frame container holding the background artwork cleanly */}
+        <div className="relative w-full max-w-[420px] sm:max-w-[480px] min-h-[680px] sm:min-h-[740px] aspect-[9/17.5] rounded-[36px] sm:rounded-[44px] overflow-hidden shadow-[0_22px_55px_rgba(70,40,30,0.25)] border border-white/80 flex flex-col justify-between p-4 sm:p-6">
           
-          {/* Background image asset inside 9:16 frame */}
+          {/* Background image asset inside taller frame */}
           <div className="absolute inset-0 z-0">
             <img 
               src="https://i.postimg.cc/8PXpb6vd/hf-20260805-164506-56dffe43-2e58-4305-87ab-f275496577e8.png"
@@ -374,228 +454,369 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
               alt="Cakenic Guidelines"
               className="w-full h-full object-cover object-center"
             />
-            <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/15 to-black/50" />
           </div>
 
           {/* GUIDELINES CONTENT CONTAINER */}
-          <div className="relative z-20 w-full h-full flex flex-col justify-between space-y-2">
+          <div className="relative z-20 w-full h-full flex flex-col justify-between overflow-hidden gap-3">
             
-            {/* GUIDELINES HEADER */}
-            <div className="text-center space-y-0.5 shrink-0">
-              <h2 className="font-serif text-2xl sm:text-3xl text-white font-semibold tracking-wide drop-shadow-md">
-                Cakenic Guidelines
+            {/* HERO-STYLE HEADER */}
+            <div className="text-center shrink-0 pt-1 pb-1">
+              <h2 className="font-serif text-3xl sm:text-4xl text-white font-medium tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                Cakenic
               </h2>
-              <p className="font-serif text-[11px] sm:text-xs text-[#FFF5ED] italic drop-shadow-sm">
-                Everything you need to know for the big day
+              <p className="font-cursive text-xl sm:text-2xl text-[#FFF5ED] -mt-1 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] font-normal">
+                Guidelines & Schedule
               </p>
             </div>
 
-            {/* ACCORDION CARDS - SCROLLS CLEANLY INSIDE 9:16 FRAME WITH BETTER TABS SPACING */}
-            <div className="flex-1 overflow-y-auto my-2 pr-0.5 space-y-3 sm:space-y-3.5 scrollbar-thin scrollbar-thumb-white/40">
+            {/* NAVIGATION TABS IN TRANSPARENT GLASS PILL STYLE */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 pt-0.5 px-0.5 w-full shrink-0 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setActiveGuidelineTab('essentials')}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
+                  activeGuidelineTab === 'essentials'
+                    ? 'bg-white text-[#332524] shadow-md font-bold scale-[1.02]'
+                    : 'bg-white/30 backdrop-blur-md text-white hover:bg-white/40 border border-white/50 shadow-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <span>✨</span>
+                <span>Event Essentials</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveGuidelineTab('cake')}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
+                  activeGuidelineTab === 'cake'
+                    ? 'bg-white text-[#332524] shadow-md font-bold scale-[1.02]'
+                    : 'bg-white/30 backdrop-blur-md text-white hover:bg-white/40 border border-white/50 shadow-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <span>🎂</span>
+                <span>Cake Rules</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveGuidelineTab('flow')}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
+                  activeGuidelineTab === 'flow'
+                    ? 'bg-white text-[#332524] shadow-md font-bold scale-[1.02]'
+                    : 'bg-white/30 backdrop-blur-md text-white hover:bg-white/40 border border-white/50 shadow-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <span>⏰</span>
+                <span>Event Flow</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveGuidelineTab('picnic')}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
+                  activeGuidelineTab === 'picnic'
+                    ? 'bg-white text-[#332524] shadow-md font-bold scale-[1.02]'
+                    : 'bg-white/30 backdrop-blur-md text-white hover:bg-white/40 border border-white/50 shadow-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <span>🌷</span>
+                <span>Setup & Prizes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveGuidelineTab('policy')}
+                className={`px-3.5 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
+                  activeGuidelineTab === 'policy'
+                    ? 'bg-white text-[#332524] shadow-md font-bold scale-[1.02]'
+                    : 'bg-white/30 backdrop-blur-md text-white hover:bg-white/40 border border-white/50 shadow-sm drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <span>☔</span>
+                <span>Ticket Policy</span>
+              </button>
+            </div>
+
+            {/* TAB CONTENT AREA WITH TRANSPARENT GLASS BACKGROUND */}
+            <div className="flex-1 overflow-y-auto my-1 bg-white/45 backdrop-blur-xl rounded-2xl p-4 sm:p-5 text-[#332524] shadow-xl border border-white/70 scrollbar-thin scrollbar-thumb-white/40 flex flex-col justify-between">
               
-              {/* Card 1: Attire & Dress Code */}
-              <div 
-                onClick={() => setActiveGuidelineTab(activeGuidelineTab === 'attire' ? null : 'attire')}
-                className="bg-[#E09990]/95 hover:bg-[#D8887E] rounded-2xl p-3 sm:p-3.5 text-white shadow-md border border-white/40 cursor-pointer transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white text-[#E09990] flex items-center justify-center shrink-0 shadow-sm">
-                      <Sparkles size={14} className="stroke-[2.2]" />
+              {/* TAB 1: EVENT ESSENTIALS (MOST CRITICAL DECISION INFO FIRST - FRIENDLY & INVITATORY!) */}
+              {activeGuidelineTab === 'essentials' && (
+                <div className="space-y-3 text-xs animate-fadeIn">
+                  <div className="border-b border-[#332524]/15 pb-2">
+                    <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
+                      <span>✨</span> Good to Know Before You Join
+                    </h3>
+                    <p className="text-[10px] text-[#7A3E34] font-bold mt-0.5">
+                      Everything you need for a wonderful Cake Day!
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🎟️</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Ticket = 1 Entry (Min Age 12+)</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
+                          Every participant requires a ticket to enter. For the safety & enjoyment of all, the minimum age is <strong>12 years old</strong>.
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-serif text-xs font-semibold leading-tight text-white">
-                        Attire & Dress Code
-                      </h3>
-                      <p className="text-[10px] text-white/90 font-sans line-clamp-1">
-                        Pastel dresses, floral prints & picnic wear
+
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🎂</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Whole Uncut Cake Required</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
+                          Each participant brings <strong>1 whole uncut cake</strong> (min 8 inches, 100% halal). Share your favorite creation with everyone!
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🎀</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">Wristband Check-In at Registration</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
+                          Simply present your registration info or <strong>Order No.</strong> upon arrival to receive your colored entry wristband.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: CAKE RULES */}
+              {activeGuidelineTab === 'cake' && (
+                <div className="space-y-2.5 text-xs animate-fadeIn">
+                  <div className="border-b border-[#332524]/15 pb-2">
+                    <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
+                      <span>🎂</span> Cake Rules & Guidelines
+                    </h3>
+                  </div>
+
+                  <ul className="space-y-2 text-[10.5px] text-[#332524]">
+                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
+                      <span className="text-sm shrink-0">🎂</span>
+                      <div><strong>1 Whole Cake (Uncut):</strong> Minimum 8 inches so there's enough to share.</div>
+                    </li>
+                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
+                      <span className="text-sm shrink-0">✨</span>
+                      <div><strong>100% Halal:</strong> Strictly no alcohol, rum, or non-halal ingredients.</div>
+                    </li>
+                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
+                      <span className="text-sm shrink-0">💗</span>
+                      <div><strong>Any Flavor:</strong> Simple or dramatic! Don't worry about perfection.</div>
+                    </li>
+                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
+                      <span className="text-sm shrink-0">☀️</span>
+                      <div><strong>No Ice Cream Cakes:</strong> Avoid cakes that melt easily outdoors.</div>
+                    </li>
+                    <li className="flex items-start gap-2 bg-white/65 backdrop-blur-md p-2.5 rounded-xl border border-[#E3A099]/40 text-[#8C5247] shadow-sm">
+                      <span className="text-sm shrink-0">📦</span>
+                      <div><strong>Cake Box Provided:</strong> Cake boxes will be provided by us to collect your Cake Dash slices!</div>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              {/* TAB 3: FLOW OF EVENT (4:00 PM - 7:00 PM) */}
+              {activeGuidelineTab === 'flow' && (
+                <div className="space-y-3 text-xs animate-fadeIn">
+                  <div className="border-b border-[#332524]/15 pb-2 flex items-center justify-between">
+                    <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
+                      <span>⏰</span> Flow of Event
+                    </h3>
+                    <span className="bg-[#E3A099] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-sm">
+                      4:00 – 7:00 PM
+                    </span>
+                  </div>
+
+                  <div className="relative pl-4 space-y-2 text-[11px] border-l-2 border-[#E3A099] my-1">
+                    {/* Step 1 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        1
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>📩</span> 4:00 PM – 5:00 PM — Arrival & Registration
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Check in with your details. Receive colored entry wristband and enter private picnic zone.
+                      </p>
+                    </div>
+
+                    {/* Step 2 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        2
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🧁</span> 5:00 PM — Cake Display & Setup (Event Start)
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Set up picnic spot (mat & cushions). Display your whole uncut cake on the shared table!
+                      </p>
+                    </div>
+
+                    {/* Step 3 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        3
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>📸</span> 5:15 PM — Cake Viewing & Group Photo
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Browse all beautiful cake creations and snap group photos with new friends.
+                      </p>
+                    </div>
+
+                    {/* Step 4 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        4
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🎂</span> 5:25 PM — Cake Dash (5 rounds)
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        5-6 mins per round! Collect delicious cake slices designated by wristband color groups.
+                      </p>
+                    </div>
+
+                    {/* Step 5 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        5
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🩷</span> 6:00 PM — Games and Free Time
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Enjoy cake slices at your spot, socialize, and play fun picnic mini games!
+                      </p>
+                    </div>
+
+                    {/* Step 6 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        6
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🏆</span> 6:30 PM — Awards
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Prize presentation for Best Outfit, Prettiest Cake & Cutest Picnic Setup!
+                      </p>
+                    </div>
+
+                    {/* Step 7 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        7
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🎁</span> 6:50 PM — Gift Moments & Last Snaps
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Receive curated gift bags and capture final memories before sunset.
+                      </p>
+                    </div>
+
+                    {/* Step 8 */}
+                    <div className="relative bg-white/40 backdrop-blur-md p-2 rounded-xl border border-white/50">
+                      <div className="absolute -left-[21px] top-2.5 w-3.5 h-3.5 rounded-full bg-[#E3A099] text-white flex items-center justify-center text-[8px] font-bold shadow-sm">
+                        8
+                      </div>
+                      <div className="font-bold text-[#332524] flex items-center gap-1 text-[11px]">
+                        <span>🌷</span> 7:00 PM — End of Event
+                      </div>
+                      <p className="text-[#523A36] text-[10px] leading-relaxed mt-0.5 font-medium">
+                        Wrap up a sweet and unforgettable Cakenic gathering!
                       </p>
                     </div>
                   </div>
-                  <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 text-white/90 ${activeGuidelineTab === 'attire' ? 'rotate-180' : ''}`} />
                 </div>
+              )}
 
-                {activeGuidelineTab === 'attire' && (
-                  <div className="pt-2.5 mt-2 border-t border-white/25 text-[10px] sm:text-[11px] space-y-1.5 text-white/95 animate-fadeIn">
-                    <div className="flex items-start gap-1.5">
-                      <span>👗</span>
-                      <div><strong>Dress Code:</strong> Soft pastels, floral prints, or cottagecore.</div>
+              {/* TAB 4: SETUP & 3 PRIZE CATEGORIES */}
+              {activeGuidelineTab === 'picnic' && (
+                <div className="space-y-2.5 text-xs animate-fadeIn">
+                  <div className="border-b border-[#332524]/15 pb-2">
+                    <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
+                      <span>🌷</span> Picnic Setup & 3 Prize Categories
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2.5 text-[10.5px] text-[#332524]">
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
+                      <div className="font-bold text-[#332524] flex items-center gap-1.5">
+                        <span>👗</span> Dress Code & Setup
+                      </div>
+                      <p className="text-[#523A36] leading-relaxed font-medium">
+                        Pastels, florals, cottagecore, ribbons & sun hats! Bring your picnic mat & cushions to sit comfortably.
+                      </p>
                     </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>🌸</span>
-                      <div><strong>Accessories:</strong> Ribbons, sun hats, cute baskets.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>✨</span>
-                      <div><strong>Best Dressed Award:</strong> Special prizes for chic outfits!</div>
+
+                    <div className="bg-white/60 backdrop-blur-md p-3 rounded-xl border border-white/70 shadow-sm space-y-1.5">
+                      <div className="font-bold text-[#8C5247] flex items-center gap-1.5 text-[11.5px]">
+                        <span>🏆</span> 3 Distinct Prize Categories
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5 text-[#523A36] text-[10.5px]">
+                        <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
+                          <span>👗</span> <span><strong>1. Best Outfit Award:</strong> Most stylish picnic ensemble</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
+                          <span>🎂</span> <span><strong>2. Prettiest Cake Award:</strong> Best decorated cake creation</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 bg-white/75 p-1.5 rounded-lg border border-white/60 shadow-xs">
+                          <span>🧺</span> <span><strong>3. Cutest Picnic Setup Award:</strong> Most charming and adorable picnic setup</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
-              {/* Card 2: Ticket & Access */}
-              <div 
-                onClick={() => setActiveGuidelineTab(activeGuidelineTab === 'venue' ? null : 'venue')}
-                className="bg-[#F7EFE9]/95 hover:bg-[#F2E7DF] rounded-2xl p-3 sm:p-3.5 text-[#332524] shadow-md border border-white/90 cursor-pointer transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#E09990]/20 text-[#8C5247] flex items-center justify-center shrink-0">
-                      <Ticket size={14} className="stroke-[2.2]" />
+              {/* TAB 5: RAIN PLAN & TICKET POLICY */}
+              {activeGuidelineTab === 'policy' && (
+                <div className="space-y-2.5 text-xs animate-fadeIn">
+                  <div className="border-b border-[#332524]/15 pb-2">
+                    <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
+                      <span>☔</span> Rain Plan & Ticket Policy
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2 text-[10.5px] text-[#332524]">
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
+                      <div className="font-bold text-[#332524] flex items-center gap-1.5">
+                        <span>☔</span> Rain Plan
+                      </div>
+                      <p className="text-[#523A36] leading-relaxed font-medium">
+                        In case of rain, outdoor activities will pause temporarily until weather clears so we can safely continue.
+                      </p>
                     </div>
-                    <div>
-                      <h3 className="font-serif text-xs font-semibold leading-tight text-[#332524]">
-                        Ticket & Access
-                      </h3>
-                      <p className="text-[10px] text-[#6B5450] font-sans line-clamp-1">
-                        Private zone entry, wristbands & perks
+
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm space-y-1">
+                      <div className="font-bold text-[#332524] flex items-center gap-1.5">
+                        <span>🌧️</span> All-Day Rain & Refund Policy
+                      </div>
+                      <p className="text-[#523A36] leading-relaxed font-medium">
+                        If severe weather persists throughout the entire scheduled event duration, please note that tickets remain non-refundable as venue permits, custom decor, and gift bag allocations are prepared in advance. We deeply appreciate your kind understanding and support!
                       </p>
                     </div>
                   </div>
-                  <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 text-[#8C5247] ${activeGuidelineTab === 'venue' ? 'rotate-180' : ''}`} />
                 </div>
-
-                {activeGuidelineTab === 'venue' && (
-                  <div className="pt-2.5 mt-2 border-t border-[#8C5247]/15 text-[10px] sm:text-[11px] space-y-1.5 text-[#6B5450] animate-fadeIn">
-                    <div className="flex items-start gap-1.5">
-                      <span>🎀</span>
-                      <div><strong>Private Zone:</strong> Entry into decorated Cakenic Zone.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>💗</span>
-                      <div><strong>Included Perks:</strong> Covers setup, permits & gift bag.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>🎟️</span>
-                      <div><strong>1 Ticket = 1 Entry:</strong> Wristband required for entry.</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card 3: Cake Rules */}
-              <div 
-                onClick={() => setActiveGuidelineTab(activeGuidelineTab === 'cake' ? null : 'cake')}
-                className="bg-[#E09990]/95 hover:bg-[#D8887E] rounded-2xl p-3 sm:p-3.5 text-white shadow-md border border-white/40 cursor-pointer transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white text-[#E09990] flex items-center justify-center shrink-0 shadow-sm">
-                      <Coffee size={14} className="stroke-[2.2]" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xs font-semibold leading-tight text-white">
-                        Cake Rules
-                      </h3>
-                      <p className="text-[10px] text-white/90 font-sans line-clamp-1">
-                        Whole cakes only, Halal & weather tips
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 text-white/90 ${activeGuidelineTab === 'cake' ? 'rotate-180' : ''}`} />
-                </div>
-
-                {activeGuidelineTab === 'cake' && (
-                  <div className="pt-2.5 mt-2 border-t border-white/25 text-[10px] sm:text-[11px] space-y-1.5 text-white/95 animate-fadeIn">
-                    <div className="flex items-start gap-1.5">
-                      <span>🎂</span>
-                      <div><strong>Whole Cakes Only:</strong> Bring 1 whole cake (min 8 inches).</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>✨</span>
-                      <div><strong>Halal & Alcohol-Free:</strong> 100% halal for all guests.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>☀️</span>
-                      <div><strong>No Ice Cream Cakes:</strong> Avoid cakes that melt outdoors.</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card 4: Picnic Setup & Contests */}
-              <div 
-                onClick={() => setActiveGuidelineTab(activeGuidelineTab === 'setup' ? null : 'setup')}
-                className="bg-[#F7EFE9]/95 hover:bg-[#F2E7DF] rounded-2xl p-3 sm:p-3.5 text-[#332524] shadow-md border border-white/90 cursor-pointer transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[#E09990]/20 text-[#8C5247] flex items-center justify-center shrink-0">
-                      <Award size={14} className="stroke-[2.2]" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xs font-semibold leading-tight text-[#332524]">
-                        Picnic Setup & Contests
-                      </h3>
-                      <p className="text-[10px] text-[#6B5450] font-sans line-clamp-1">
-                        Mat & cushions, Cake Dash & awards
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 text-[#8C5247] ${activeGuidelineTab === 'setup' ? 'rotate-180' : ''}`} />
-                </div>
-
-                {activeGuidelineTab === 'setup' && (
-                  <div className="pt-2.5 mt-2 border-t border-[#8C5247]/15 text-[10px] sm:text-[11px] space-y-1.5 text-[#6B5450] animate-fadeIn">
-                    <div className="flex items-start gap-1.5">
-                      <span>🌷</span>
-                      <div><strong>Setup:</strong> Bring your mat & cushions. Cakes share tables.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>🍰</span>
-                      <div><strong>Cake Dash:</strong> Sample delicious slices during our Cake Dash!</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>👗</span>
-                      <div><strong>Awards:</strong> Prizes for <em>Prettiest Cake</em> & <em>Best Outfit</em>!</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Card 5: Weather & Ticket Policy */}
-              <div 
-                onClick={() => setActiveGuidelineTab(activeGuidelineTab === 'weather' ? null : 'weather')}
-                className="bg-[#E09990]/95 hover:bg-[#D8887E] rounded-2xl p-3 sm:p-3.5 text-white shadow-md border border-white/40 cursor-pointer transition-all duration-200"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-white text-[#E09990] flex items-center justify-center shrink-0 shadow-sm">
-                      <Sun size={14} className="stroke-[2.2]" />
-                    </div>
-                    <div>
-                      <h3 className="font-serif text-xs font-semibold leading-tight text-white">
-                        Weather & Policy
-                      </h3>
-                      <p className="text-[10px] text-white/90 font-sans line-clamp-1">
-                        Rain shelter plan & booking terms
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronDown size={15} className={`shrink-0 transition-transform duration-300 text-white/90 ${activeGuidelineTab === 'weather' ? 'rotate-180' : ''}`} />
-                </div>
-
-                {activeGuidelineTab === 'weather' && (
-                  <div className="pt-2.5 mt-2 border-t border-white/25 text-[10px] sm:text-[11px] space-y-1.5 text-white/95 animate-fadeIn">
-                    <div className="flex items-start gap-1.5">
-                      <span>☔</span>
-                      <div><strong>Rain Plan:</strong> Pause in sheltered park pavilions until clear.</div>
-                    </div>
-                    <div className="flex items-start gap-1.5">
-                      <span>💕</span>
-                      <div><strong>Policy:</strong> Tickets are non-refundable due to venue permits.</div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
 
             </div>
 
-            {/* BOTTOM RIBBON NOTE INSIDE 9:16 FRAME */}
-            <div className="shrink-0 pt-0.5 text-center">
-              <div className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] text-white font-sans font-medium border border-white/30 inline-flex items-center gap-1 shadow-sm">
-                <Sparkles size={11} className="text-[#FFF5ED]" />
-                <span>Tap cards for details • See you at Cakenic!</span>
+            {/* BOTTOM RIBBON NOTE INSIDE TALL 9:17 FRAME */}
+            <div className="shrink-0 pt-1 text-center">
+              <div className="bg-white/25 backdrop-blur-md px-3.5 py-1.5 rounded-full text-[10.5px] text-white font-sans font-medium border border-white/40 inline-flex items-center gap-1.5 shadow-sm">
+                <Sparkles size={12} className="text-[#FFF5ED]" />
+                <span>See you at Cakenic! • 4:00 PM to 7:00 PM</span>
               </div>
             </div>
 
@@ -641,7 +862,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <span>How do I receive my ticket after booking?</span>
               </h4>
               <p className="text-[#6B5450] text-xs pl-5 leading-snug">
-                Upon successful checkout, your official E-Ticket details and QR confirmation are sent instantly via email and WhatsApp.
+                After checkout, you will receive a CHIP confirmation email with your Order No. Simply present your details or Order No. during event registration to collect your colored entry wristband!
               </p>
             </div>
 
@@ -651,7 +872,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <span>Can I bring non-ticketed friends or kids?</span>
               </h4>
               <p className="text-white/95 text-xs pl-5 leading-snug">
-                1 ticket = 1 entry into our decorated Cakenic Zone (ages 12+). Friends can enjoy the surrounding public park area.
+                Only guests with a valid ticket can enter the designated Cakenic zone area (ages 12+). Non-ticketed friends or family members are welcome to enjoy the surrounding public park area, but only ticket holders can enter the Cakenic picnic zone.
               </p>
             </div>
 
@@ -671,7 +892,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <span>What happens if it rains?</span>
               </h4>
               <p className="text-white/95 text-xs pl-5 leading-snug">
-                In case of rain, we pause in sheltered park pavilions until clear, then resume the outdoor fun!
+                In case of rain, we will pause temporarily until the weather clears, then resume our outdoor fun!
               </p>
             </div>
 
@@ -680,42 +901,169 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
         </div>
       </section>
 
+      {/* --- BEAUTIFUL E-TICKET LOOKUP SECTION (AFTER FAQ) --- */}
+      <section id="lookup-ticket" className="py-12 px-4 max-w-xl mx-auto w-full relative z-20">
+        <div className="bg-[#FBF6F1] border border-[#332524]/15 rounded-[32px] p-6 sm:p-8 shadow-[0_16px_40px_rgba(150,110,100,0.15)] text-[#332524] relative overflow-hidden">
+          
+          <div className="text-center space-y-1.5 mb-6">
+            <div className="inline-flex items-center gap-1.5 bg-[#E3A099]/15 text-[#E3A099] border border-[#E3A099]/30 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em]">
+              <Ticket size={13} />
+              <span>E-Pass Retrieval</span>
+            </div>
+
+            <h3 className="font-serif text-2xl sm:text-3xl font-semibold text-[#332524]">
+              Access Your E-Ticket
+            </h3>
+
+            <p className="text-xs text-[#6B5450] max-w-sm mx-auto leading-relaxed">
+              Already reserved your Cakenic ticket? Enter your Email or Phone number below to view and print your ticket details.
+            </p>
+          </div>
+
+          <form onSubmit={handleLookupTicket} className="space-y-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#332524]/80 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B5450]" />
+                  <input
+                    type="email"
+                    value={lookupEmail}
+                    onChange={(e) => setLookupEmail(e.target.value)}
+                    placeholder="sarah@example.com"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-[#332524]/15 rounded-xl text-xs text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 transition-all shadow-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#332524]/80 mb-1">
+                  Phone Number
+                </label>
+                <div className="relative">
+                  <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B5450]" />
+                  <input
+                    type="tel"
+                    value={lookupPhone}
+                    onChange={(e) => setLookupPhone(e.target.value)}
+                    placeholder="e.g. 0123456789"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-[#332524]/15 rounded-xl text-xs text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 transition-all shadow-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {lookupError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-xl flex items-start gap-2">
+                <AlertCircle size={15} className="shrink-0 text-red-600 mt-0.5" />
+                <span className="leading-snug">{lookupError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSearchingTicket}
+              className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-[0_6px_20px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSearchingTicket ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Searching E-Pass Database...</span>
+                </>
+              ) : (
+                <>
+                  <Search size={16} />
+                  <span>Find My Ticket</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* List of found orders */}
+          {foundOrders.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-dashed border-[#332524]/15 space-y-2.5">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#332524] text-center">
+                Found {foundOrders.length} Ticket Record(s):
+              </h4>
+              <div className="space-y-2">
+                {foundOrders.map(ord => (
+                  <div 
+                    key={ord.id}
+                    onClick={() => {
+                      setSelectedOrderForView(ord);
+                      setShowTicketModal(true);
+                    }}
+                    className="bg-white border border-[#332524]/15 hover:border-[#E3A099] rounded-2xl p-3.5 cursor-pointer transition-all shadow-sm hover:shadow-md flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-[#332524]">Order #{ord.id}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                          ord.status === 'paid' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {ord.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#6B5450] mt-0.5 font-medium">
+                        {ord.items[0]?.name?.replace('TICKET: ', '')} • {ord.customerName}
+                      </p>
+                    </div>
+
+                    <button className="bg-[#E3A099]/15 text-[#E3A099] font-bold text-[11px] px-3 py-1 rounded-full hover:bg-[#E3A099] hover:text-white transition-colors">
+                      View E-Pass
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3.5 text-center">
+            <p className="text-[10px] text-[#6B5450]/80 italic">
+              📩 Note: An official receipt email containing your Order No. is sent via CHIP after payment.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* --- DIRECT EMBEDDED PAYMENT CHECKOUT MODAL --- */}
       {showCheckoutModal && selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in">
-          <div className="bg-[#FBF6F1] rounded-[44px] max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-[0_24px_60px_rgba(150,110,100,0.25)] p-8 md:p-10 relative text-[#332524]">
+          <div className="bg-[#FBF6F1] rounded-[36px] max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-[0_24px_60px_rgba(150,110,100,0.25)] border border-[#332524]/10 p-7 md:p-9 relative text-[#332524]">
             
             <button 
               onClick={() => setShowCheckoutModal(false)}
-              className="absolute top-6 right-6 text-[#6B5450] hover:text-[#332524] bg-[#F1E8E2] w-9 h-9 rounded-full flex items-center justify-center"
+              className="absolute top-6 right-6 text-[#6B5450] hover:text-[#332524] bg-[#F1E8E2] hover:bg-[#e8ddd5] w-9 h-9 rounded-full flex items-center justify-center transition-colors"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-2 text-xs text-[#E3A099] font-bold uppercase tracking-wider mb-2">
+            <div className="flex items-center gap-2 text-[11px] text-[#E3A099] font-bold uppercase tracking-[0.2em] mb-2">
               <Ticket size={16} />
-              <span>Ticket Purchase</span>
+              <span>Ticket Reservation</span>
             </div>
 
-            <h3 className="font-sans text-3xl font-extrabold text-[#332524] mb-1">
+            <h3 className="font-display font-black text-2xl sm:text-3xl text-[#332524] tracking-[0.12em] uppercase mb-1">
               {selectedTicket.location}
             </h3>
-            <p className="text-xs text-[#6B5450] mb-6">{selectedTicket.date} • {selectedTicket.venue}</p>
+            <p className="text-xs text-[#6B5450] mb-6 font-medium">{selectedTicket.date} • {selectedTicket.venue}</p>
 
             {/* Price Summary */}
-            <div className="bg-[#F1E8E2]/70 p-5 rounded-[28px] mb-6 space-y-3 text-xs sm:text-sm">
+            <div className="bg-white/80 border border-[#332524]/10 p-5 rounded-[24px] mb-6 space-y-3.5 shadow-sm text-xs sm:text-sm">
               <div className="flex justify-between items-center">
                 <span className="font-medium text-[#6B5450]">Ticket Rate:</span>
-                <span className="font-bold">RM {selectedTicket.price} / person</span>
+                <span className="font-bold text-[#332524]">RM {selectedTicket.price} / person</span>
               </div>
               
               <div className="flex justify-between items-center">
                 <span className="font-medium text-[#6B5450]">Number of Passes:</span>
-                <div className="flex items-center gap-3 bg-[#FBF6F1] px-4 py-1.5 rounded-full">
+                <div className="flex items-center gap-3 bg-[#FBF6F1] border border-[#332524]/10 px-4 py-1.5 rounded-full">
                   <button 
                     type="button" 
                     onClick={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))}
-                    className="font-bold px-1 text-[#E3A099]"
+                    className="font-bold px-1 text-[#E3A099] hover:text-[#332524] transition-colors"
                   >
                     -
                   </button>
@@ -723,66 +1071,66 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                   <button 
                     type="button" 
                     onClick={() => setTicketQuantity(ticketQuantity + 1)}
-                    className="font-bold px-1 text-[#E3A099]"
+                    className="font-bold px-1 text-[#E3A099] hover:text-[#332524] transition-colors"
                   >
                     +
                   </button>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#332524]/10 flex justify-between items-center text-base font-bold text-[#E3A099]">
+              <div className="pt-3 border-t border-[#332524]/10 flex justify-between items-center text-sm font-bold text-[#E3A099]">
                 <span>Total Amount:</span>
-                <span className="font-sans text-xl font-extrabold">RM {selectedTicket.price * ticketQuantity}</span>
+                <span className="font-serif text-2xl font-bold text-[#E3A099]">RM {selectedTicket.price * ticketQuantity}</span>
               </div>
             </div>
 
             {/* Registration Form */}
             <form onSubmit={handlePaymentSubmit} className="space-y-4 text-xs sm:text-sm">
               <div>
-                <label className="block font-bold text-[#332524] mb-1">Full Name *</label>
+                <label className="block font-sans text-[11px] uppercase tracking-wider font-bold text-[#332524]/80 mb-1.5">Full Name *</label>
                 <input 
                   type="text" 
                   required
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="e.g. Siti Sarah"
-                  className="w-full px-4 py-3 bg-white/90 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#E3A099]"
+                  className="w-full px-5 py-3 bg-white border border-[#332524]/15 rounded-full text-xs sm:text-sm text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 shadow-sm transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-[#332524] mb-1">Email *</label>
+                  <label className="block font-sans text-[11px] uppercase tracking-wider font-bold text-[#332524]/80 mb-1.5">Email *</label>
                   <input 
                     type="email" 
                     required
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="sarah@example.com"
-                    className="w-full px-4 py-3 bg-white/90 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#E3A099]"
+                    className="w-full px-5 py-3 bg-white border border-[#332524]/15 rounded-full text-xs sm:text-sm text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 shadow-sm transition-all"
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#332524] mb-1">Phone (WhatsApp) *</label>
+                  <label className="block font-sans text-[11px] uppercase tracking-wider font-bold text-[#332524]/80 mb-1.5">Phone (WhatsApp) *</label>
                   <input 
                     type="tel" 
                     required
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="+60123456789"
-                    className="w-full px-4 py-3 bg-white/90 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#E3A099]"
+                    className="w-full px-5 py-3 bg-white border border-[#332524]/15 rounded-full text-xs sm:text-sm text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 shadow-sm transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-bold text-[#332524] mb-1">Instagram Handle (Optional)</label>
+                <label className="block font-sans text-[11px] uppercase tracking-wider font-bold text-[#332524]/80 mb-1.5">Instagram Handle (Optional)</label>
                 <input 
                   type="text" 
                   value={instagramHandle}
                   onChange={(e) => setInstagramHandle(e.target.value)}
                   placeholder="@yourhandle (Optional)"
-                  className="w-full px-4 py-3 bg-white/90 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#E3A099]"
+                  className="w-full px-5 py-3 bg-white border border-[#332524]/15 rounded-full text-xs sm:text-sm text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 shadow-sm transition-all"
                 />
               </div>
 
@@ -822,11 +1170,20 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 </div>
               )}
 
-              <div className="pt-3 space-y-2">
+              {/* Order Receipt / Order No Info Box */}
+              <div className="bg-[#E3A099]/10 border border-[#E3A099]/30 rounded-2xl p-3 text.xs text-[#6B5450] flex items-start gap-2.5">
+                <Mail size={16} className="text-[#E3A099] shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <strong className="text-[#332524] font-bold block mb-0.5">CHIP Receipt & Order No. Notice:</strong>
+                  After completing payment, you will receive a CHIP receipt email containing your unique <strong>Order No.</strong> Keep this Order No. to view your E-Pass ticket anytime on our site!
+                </div>
+              </div>
+
+              <div className="pt-3 space-y-2.5">
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="w-full bg-[#E3A099] hover:bg-[#F0BDB5] text-white py-4 px-4 rounded-full font-bold text-sm sm:text-base transition-all duration-300 shadow-[0_6px_18px_rgba(200,130,120,0.28)] flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-4 px-6 rounded-full font-bold text-xs sm:text-sm tracking-widest uppercase transition-all duration-300 shadow-[0_8px_24px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2.5 disabled:opacity-50"
                 >
                   {isProcessing ? (
                     <>
@@ -835,18 +1192,30 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                     </>
                   ) : (
                     <>
-                      <ShieldCheck size={20} />
+                      <ShieldCheck size={18} />
                       <span>Proceed to Payment</span>
                     </>
                   )}
                 </button>
 
-                <p className="text-center text-[11px] text-[#6B5450] font-medium tracking-wide">
+                <p className="text-center text-[10px] sm:text-[11px] text-[#6B5450] font-bold uppercase tracking-widest opacity-70">
                   secure payment powered by CHIP
                 </p>
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/* --- E-TICKET VIEW MODAL OVERLAY --- */}
+      {showTicketModal && selectedOrderForView && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md overflow-y-auto animate-in fade-in">
+          <div className="my-auto max-w-xl w-full relative">
+            <CakenicTicketView 
+              order={selectedOrderForView} 
+              onClose={() => setShowTicketModal(false)} 
+            />
           </div>
         </div>
       )}
