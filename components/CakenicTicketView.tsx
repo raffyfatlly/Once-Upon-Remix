@@ -30,7 +30,7 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
   // If this is a payment cancellation state
   if (isCancel || order.status === 'cancelled' || order.status === 'failed') {
     return (
-      <div className="bg-[#FBF6F1] rounded-[36px] max-w-lg w-full p-6 sm:p-8 border border-[#332524]/10 shadow-[0_24px_60px_rgba(150,110,100,0.25)] relative text-[#332524] my-4 mx-auto animate-in fade-in zoom-in-95">
+      <div id="cakenic-ticket-printable" className="bg-[#FBF6F1] rounded-[36px] max-w-lg w-full p-6 sm:p-8 border border-[#332524]/10 shadow-[0_24px_60px_rgba(150,110,100,0.25)] relative text-[#332524] my-4 mx-auto animate-in fade-in zoom-in-95">
         {onClose && (
           <button 
             onClick={onClose}
@@ -95,7 +95,7 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
   }
 
   return (
-    <div className="bg-[#FBF6F1] rounded-[36px] max-w-lg w-full p-6 sm:p-8 border border-[#332524]/15 shadow-[0_24px_60px_rgba(150,110,100,0.25)] relative text-[#332524] my-4 mx-auto animate-in fade-in zoom-in-95 font-sans print:shadow-none print:border-none">
+    <div id="cakenic-ticket-printable" className="bg-[#FBF6F1] rounded-[36px] max-w-lg w-full p-6 sm:p-8 border border-[#332524]/15 shadow-[0_24px_60px_rgba(150,110,100,0.25)] relative text-[#332524] my-4 mx-auto animate-in fade-in zoom-in-95 font-sans print:shadow-none print:border-none">
       
       {onClose && (
         <button 

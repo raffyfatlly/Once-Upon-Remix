@@ -402,9 +402,15 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                   </p>
                 </div>
 
-                {/* 3. PRICE TAG */}
-                <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
-                  RM {loc.price}
+                {/* 3. PRICE TAG & REMAINING STOCK */}
+                <div className="flex flex-col items-center gap-1">
+                  <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
+                    RM {loc.price}
+                  </div>
+                  <div className="bg-[#8C5247]/10 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-[#8C5247]/15">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse shrink-0" />
+                    <span>{loc.availableSlots} tickets left</span>
+                  </div>
                 </div>
 
                 {/* 4. BUTTON WITH LIGHT SAGE GREEN HOVER rgb(197, 221, 216) */}
@@ -1103,6 +1109,14 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
               </div>
               
               <div className="flex justify-between items-center">
+                <span className="font-medium text-[#6B5450]">Tickets Remaining:</span>
+                <span className="font-bold text-[#8C5247] bg-[#8C5247]/10 px-2.5 py-0.5 rounded-full text-[11px] flex items-center gap-1 border border-[#8C5247]/15">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse" />
+                  <span>{selectedTicket.availableSlots} left</span>
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center">
                 <span className="font-medium text-[#6B5450]">Number of Passes:</span>
                 <div className="flex items-center gap-3 bg-[#FBF6F1] border border-[#332524]/10 px-4 py-1.5 rounded-full">
                   <button 
@@ -1115,7 +1129,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                   <span className="font-bold text-[#332524]">{ticketQuantity}</span>
                   <button 
                     type="button" 
-                    onClick={() => setTicketQuantity(ticketQuantity + 1)}
+                    onClick={() => setTicketQuantity(Math.min(selectedTicket.availableSlots || 99, ticketQuantity + 1))}
                     className="font-bold px-1 text-[#E3A099] hover:text-[#332524] transition-colors"
                   >
                     +
