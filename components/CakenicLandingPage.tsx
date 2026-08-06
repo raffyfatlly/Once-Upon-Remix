@@ -604,6 +604,16 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                         </span>
                       </div>
                     </div>
+
+                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">💌</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">Ticket Terms & Friendly Transfers</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
+                          Tickets are non-refundable and valid strictly for the booked session (non-transferable to future events). If you cannot make it, you are welcome to gift or transfer your pass to a friend!
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
