@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Instagram, Heart, Lock, MessageCircle } from 'lucide-react';
+import { Instagram, Heart, Lock, MessageCircle, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface FooterProps {

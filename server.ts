@@ -142,6 +142,149 @@ async function startServer() {
     });
   }
 
+  // CHIP Payment Gateway Status Check Endpoint
+  app.get("/api/chip/status", (req, res) => {
+    const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+    const brandId = (process.env.CHIP_ID || process.env.CHIP_BRAND_ID || process.env.VITE_CHIP_ID || '').trim().replace(/^["']|["']$/g, '');
+    return res.json({
+      configured: Boolean(apiKey && brandId),
+      hasApiKey: Boolean(apiKey),
+      hasBrandId: Boolean(brandId),
+      brandIdPreview: brandId ? `${brandId.substring(0, 4)}...${brandId.substring(Math.max(0, brandId.length - 4))}` : null
+    });
+  });
+
+  // CHIP Payment Gateway Proxy Endpoint
+  app.post("/api/chip/purchases/", async (req, res) => {
+    try {
+      const authHeader = req.headers.authorization;
+      const clientApiKey = authHeader && authHeader.replace(/^Bearer\s+/i, '') !== 'undefined' && authHeader.replace(/^Bearer\s+/i, '') !== 'CHIP_API' ? authHeader.replace(/^Bearer\s+/i, '') : '';
+      
+      const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || clientApiKey || '').trim().replace(/^["']|["']$/g, '');
+      const clientBrandId = req.body.brand_id && req.body.brand_id !== 'CHIP_BRAND_ID' && req.body.brand_id !== 'CHIP_ID' ? req.body.brand_id : '';
+      const envBrandId = (process.env.CHIP_ID || process.env.CHIP_BRAND_ID || process.env.VITE_CHIP_ID || process.env.VITE_CHIP_BRAND_ID || '').trim().replace(/^["']|["']$/g, '');
+      const brandId = envBrandId || clientBrandId || 'a8861126-311a-465d-a7c2-1d5b43c05e7f';
+
+      if (!apiKey) {
+        return res.status(400).json({ 
+          message: "CHIP Payment Gateway API key is missing. Please ensure CHIP_API and CHIP_ID are configured in Settings > Secrets." 
+        });
+      }
+
+      if (!brandId) {
+        return res.status(400).json({ 
+          message: "CHIP Brand ID is missing. Please ensure CHIP_ID and CHIP_API are configured in Settings > Secrets." 
+        });
+      }
+
+      // Format client phone number for CHIP API standards (E.164 format)
+      const clientObj = req.body.client || {};
+      let rawPhone = (clientObj.phone || '').toString().trim().replace(/[^0-9+]/g, '');
+      if (rawPhone && !rawPhone.startsWith('+')) {
+        if (rawPhone.startsWith('60')) {
+          rawPhone = '+' + rawPhone;
+        } else if (rawPhone.startsWith('0')) {
+          rawPhone = '+60' + rawPhone.substring(1);
+        } else {
+          rawPhone = '+60' + rawPhone;
+        }
+      }
+      if (!rawPhone || rawPhone.length < 8) {
+        rawPhone = '+60120000000';
+      }
+
+      // Format products array to ensure price is integer in cents
+      const rawPurchase = req.body.purchase || {};
+      const rawProducts = Array.isArray(rawPurchase.products) ? rawPurchase.products : [];
+      const formattedProducts = rawProducts.map((p: any) => ({
+        name: String(p.name || 'Item').substring(0, 256),
+        quantity: Math.max(1, parseInt(p.quantity, 10) || 1),
+        price: Math.round(Number(p.price) || 0)
+      }));
+
+      const requestBody = {
+        brand_id: brandId,
+        client: {
+          email: (clientObj.email || 'customer@example.com').trim(),
+          phone: rawPhone,
+          full_name: (clientObj.full_name || 'Customer').trim().substring(0, 30),
+        },
+        purchase: {
+          currency: rawPurchase.currency || 'MYR',
+          products: formattedProducts
+        },
+        reference: (req.body.reference || `ORDER-${Date.now()}`).toString(),
+        success_redirect: req.body.success_redirect,
+        failure_redirect: req.body.failure_redirect,
+        cancel_redirect: req.body.cancel_redirect,
+        ...(req.body.force_redirect !== undefined ? { force_redirect: req.body.force_redirect } : { force_redirect: true })
+      };
+
+      console.log("Connecting to CHIP Gateway with Brand ID:", brandId, "Reference:", requestBody.reference);
+
+      const chipResponse = await fetch("https://gate.chip-in.asia/api/v1/purchases/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      let responseData: any = {};
+      const responseText = await chipResponse.text();
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        console.error("Non-JSON response from CHIP Gateway:", responseText);
+        return res.status(chipResponse.status).json({
+          message: `CHIP Gateway Error (${chipResponse.status}): ${responseText.substring(0, 200)}`
+        });
+      }
+
+      if (!chipResponse.ok) {
+        console.error("CHIP Gateway API error:", chipResponse.status, responseData);
+        let errorMsg = responseData.message || responseData.error || responseData.detail;
+        if (!errorMsg && responseData.errors) {
+          if (typeof responseData.errors === 'string') {
+            errorMsg = responseData.errors;
+          } else if (typeof responseData.errors === 'object') {
+            errorMsg = Object.entries(responseData.errors)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : v}`)
+              .join('; ');
+          }
+        }
+        return res.status(chipResponse.status).json({
+          ...responseData,
+          message: errorMsg || `CHIP Gateway Error (${chipResponse.status}): ${JSON.stringify(responseData)}`
+        });
+      }
+
+      // Check if CHIP immediately cancelled the purchase due to missing merchant terminals
+      if (responseData.status === 'cancelled' || responseData.status === 'failed') {
+        const attemptErr = responseData.transaction_data?.attempts?.[0]?.error;
+        const errCode = attemptErr?.code || 'purchase_cancelled';
+        const errDetail = attemptErr?.message || 'No matching terminal';
+        
+        console.warn("CHIP purchase returned cancelled status:", errCode, errDetail);
+        
+        return res.status(400).json({
+          ...responseData,
+          success: false,
+          error_code: errCode,
+          message: errCode === 'no_matching_terminal'
+            ? `CHIP Terminal Missing: Your CHIP Brand ID (${brandId}) does not have active Payment Terminals (FPX / Visa / Mastercard) configured in your CHIP Merchant Portal at gate.chip-in.asia.`
+            : `CHIP Payment Failed (${errCode}): ${errDetail}`
+        });
+      }
+
+      return res.json(responseData);
+    } catch (err: any) {
+      console.error("Server proxy error calling CHIP gateway:", err);
+      return res.status(500).json({ message: err.message || "Failed to connect to CHIP payment gateway." });
+    }
+  });
+
   // API endpoints
   app.post("/api/analytics/expert", async (req, res) => {
     if (!ai) {

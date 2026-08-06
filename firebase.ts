@@ -111,23 +111,8 @@ export const createOrderInDb = async (orderData: Omit<Order, 'id'>) => {
     // Check availability for each item
     productDocs.forEach((docSnapshot, index) => {
       const requestedItem = productReads[index];
-      
-      if (!docSnapshot.exists()) {
-         throw new Error(`Product ${requestedItem.id} no longer exists.`);
-      }
-      
-      const productData = docSnapshot.data();
-      if (!productData) {
-        throw new Error(`Product data missing for ${requestedItem.id}`);
-      }
-
-      // PRE-ORDER LOGIC UPDATE:
-      // We no longer throw an error if currentStock < requestedItem.qty.
-      // Instead, we allow the stock to go negative, which indicates pre-orders/backlog.
-      // const currentStock = productData.stock || 0;
-      // if (currentStock < requestedItem.qty) {
-      //   throw new Error(`Sorry, "${productData.name}" is out of stock...`);
-      // }
+      // Note: If doc doesn't exist yet in DB (e.g. newly added ticket or custom product), 
+      // we will automatically initialize it in section 4 instead of failing the transaction.
     });
 
     // 3. COUNTER CHECK: Reference the counter document
@@ -145,13 +130,25 @@ export const createOrderInDb = async (orderData: Omit<Order, 'id'>) => {
 
     // 4. WRITES: Now we perform all the updates
     
-    // A. Deduct Stock (allowing negative values for pre-orders)
+    // A. Deduct Stock (allowing negative values for pre-orders / auto-initializing missing docs)
     productDocs.forEach((docSnapshot, index) => {
       const requestedItem = productReads[index];
-      const productData = docSnapshot.data();
-      const currentStock = (productData && productData.stock) || 0;
-      const newStock = currentStock - requestedItem.qty;
-      transaction.update(requestedItem.ref, { stock: newStock });
+      if (docSnapshot.exists()) {
+        const productData = docSnapshot.data();
+        const currentStock = (productData && productData.stock) || 0;
+        const newStock = currentStock - requestedItem.qty;
+        transaction.update(requestedItem.ref, { stock: newStock });
+      } else {
+        const itemInfo = orderData.items.find(i => (i.baseProductId || i.id) === requestedItem.id);
+        transaction.set(requestedItem.ref, {
+          name: itemInfo?.name || requestedItem.id,
+          price: itemInfo?.price || 0,
+          stock: 50 - requestedItem.qty,
+          category: itemInfo?.category || 'Event Ticket',
+          collection: itemInfo?.collection || 'Cakenic 2026',
+          image: itemInfo?.image || ''
+        });
+      }
     });
 
     // B. Create Order ID

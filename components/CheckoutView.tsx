@@ -136,9 +136,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
   }
 
   const getPaymentConfig = () => {
-    const env = (import.meta as any).env;
+    const env = (import.meta as any).env || {};
     return {
-      brandId: env.VITE_CHIP_ID || env.CHIP_ID,
+      brandId: env.VITE_CHIP_ID || env.CHIP_ID || 'a8861126-311a-465d-a7c2-1d5b43c05e7f',
       apiKey: env.VITE_CHIP_API || env.CHIP_API
     };
   };
@@ -204,11 +204,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
     setError('');
 
     const { brandId, apiKey } = getPaymentConfig();
-    if (!brandId || !apiKey) {
-      setError("Payment Configuration Missing. Please contact support.");
-      setIsProcessing(false);
-      return;
-    }
     
     try {
       // 1. Create Order in Database
@@ -280,10 +275,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
         cancel_redirect: `${window.location.origin}/#/payment/callback?result=cancelled&order=${orderRef.id}`,
       };
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (apiKey && apiKey !== 'CHIP_API' && apiKey !== 'undefined') {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
       // 3. Call API
       const response = await fetch(API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        headers,
         body: JSON.stringify(payload)
       });
 
@@ -309,6 +309,46 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
       } else {
          setError(err.message || "Failed to initiate payment. Please try again.");
       }
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBankTransferSubmit = async () => {
+    if (cart.length === 0) {
+      setError("Your shopping bag is empty.");
+      navigate('/cart');
+      return;
+    }
+
+    setIsProcessing(true);
+    setError('');
+
+    try {
+      const attribution = getAttribution();
+      const orderRef = await createOrderInDb({
+        customerName: `${firstName} ${lastName}`,
+        customerEmail: email,
+        customerPhone: phone,
+        items: cart,
+        total: total,
+        status: 'pending_transfer',
+        date: new Date().toISOString(),
+        shippingAddress: `${address}, ${postcode} ${city}, ${region === 'sg' ? 'Singapore' : region === 'east' ? 'East Malaysia' : 'West Malaysia'}`,
+        isGift: isGift,
+        giftTo: isGift ? (giftTo || '') : '',
+        giftFrom: isGift ? (giftFrom || '') : '',
+        giftMessage: isGift ? (giftMessage || '') : '',
+        adminNotes: 'Direct Maybank Transfer (562188327902 - VANILLICIOUS ENTERPRISE)',
+        utm_source: attribution.first_utm_source || 'direct',
+        utm_medium: attribution.first_utm_medium || 'none',
+        utm_campaign: attribution.first_utm_campaign || 'none'
+      });
+
+      onOrderSuccess();
+      window.location.href = `${window.location.origin}/#/payment/callback?result=success&order=${orderRef.id}&method=bank_transfer`;
+    } catch (err: any) {
+      console.error("Bank Transfer Order Error:", err);
+      setError(err.message || "Failed to create order. Please try again.");
       setIsProcessing(false);
     }
   };
@@ -593,11 +633,11 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
 
                  {/* Error Display */}
                  {error && (
-                    <div className="bg-red-50 p-4 rounded border border-red-100 flex items-start gap-3">
-                      <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+                    <div className="bg-red-50 p-4 rounded-2xl border border-red-200 flex items-start gap-3">
+                      <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
                       <div className="flex-1">
-                        <p className="text-red-600 text-sm font-bold mb-1">Could Not Process Order</p>
-                        <p className="text-red-500 text-xs">{error}</p>
+                        <p className="text-red-700 text-sm font-bold mb-0.5">Payment Gateway Error</p>
+                        <p className="text-red-600 text-xs leading-relaxed">{error}</p>
                       </div>
                     </div>
                   )}

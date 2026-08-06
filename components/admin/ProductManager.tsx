@@ -85,6 +85,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     adultSizeDesc: '150 cm x 100 cm',
     isCheckoutAddon: false,
     isPosOnly: false,
+    isCakenicOnly: false,
     isLive: true
   });
 
@@ -103,6 +104,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         adultSizeDesc: product.adultSizeDesc || '150 cm x 100 cm',
         isCheckoutAddon: product.isCheckoutAddon || false,
         isPosOnly: product.isPosOnly || false,
+        isCakenicOnly: product.isCakenicOnly || false,
         isLive: product.isLive !== undefined ? product.isLive : true
     });
     setEditingProduct(product);
@@ -134,6 +136,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
       adultSizeDesc: '150 cm x 100 cm',
       isCheckoutAddon: false,
       isPosOnly: false,
+      isCakenicOnly: false,
       isLive: true
     });
     setEditingProduct(null);
@@ -204,6 +207,24 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         babySizeDesc: '110 cm x 110 cm',
         adultPrice: 185,
         adultSizeDesc: '150 cm x 150 cm'
+      },
+      {
+        name: 'Cakenic Putrajaya',
+        price: 68,
+        description: 'Join us under the lush trees of Putrajaya for an unforgettable afternoon of cake sharing, picnic vibes, and sweet memories. Secret Garden Park, Putrajaya.',
+        image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
+        category: 'Event Ticket',
+        collection: 'Cakenic 2026',
+        stock: 45
+      },
+      {
+        name: 'Cakenic Johor Bahru',
+        price: 88,
+        description: 'An exclusive Southern Cakenic gathering featuring curated gift bags, prizes, and a dream botanical picnic setting. Eco Spring Botanic Garden, JB.',
+        image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
+        category: 'Event Ticket',
+        collection: 'Cakenic 2026',
+        stock: 30
       }
     ];
 
@@ -428,6 +449,25 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                     </div>
                   </div>
                 )}
+                </div>
+              </div>
+
+              {/* Cakenic Website Only Toggle */}
+              <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-[2px] flex items-center gap-3">
+                <input 
+                  type="checkbox" 
+                  id="isCakenicOnly"
+                  checked={formData.isCakenicOnly || false} 
+                  onChange={e => setFormData({...formData, isCakenicOnly: e.target.checked})} 
+                  className="w-4 h-4 text-brand-flamingo focus:ring-brand-flamingo rounded border-gray-300 cursor-pointer"
+                />
+                <div>
+                  <label htmlFor="isCakenicOnly" className="text-xs font-bold text-gray-900 cursor-pointer block">
+                    Cakenic Website Only (Exclude from Main Store Listing)
+                  </label>
+                  <p className="text-[10px] text-gray-500">
+                    When checked, this product/ticket will only be visible on the Cakenic Event pages and hidden from the main website shop catalog.
+                  </p>
                 </div>
               </div>
 

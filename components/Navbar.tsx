@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingBag, Menu, X, Star, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShoppingBag, Menu, X, Star, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NAVIGATION_LINKS } from '../constants';
 import { Product } from '../types';
@@ -83,12 +83,9 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
           </button>
 
           {/* Desktop Left Links */}
-          <div className="hidden md:flex space-x-8 items-center flex-1">
+          <div className="hidden md:flex space-x-10 items-center flex-1">
              <Link to="/" className="font-sans text-[10px] tracking-[0.15em] text-gray-500 hover:text-brand-flamingo transition-colors uppercase font-bold">Shop</Link>
              <Link to="/story" className="font-sans text-[10px] tracking-[0.15em] text-gray-500 hover:text-brand-flamingo transition-colors uppercase font-bold">Story</Link>
-             <Link to="/cakenic" className="font-sans text-[10px] tracking-[0.15em] text-[#E8A29A] hover:text-brand-flamingo transition-colors uppercase font-bold flex items-center gap-1">
-               Cakenic 🍰
-             </Link>
              
              {/* Desktop Collections Dropdown */}
              <div className="relative group/collections">

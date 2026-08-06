@@ -453,11 +453,10 @@ const App: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   // Initialize showIntro. 
-  // If we are landing on the payment callback page (e.g. returning from gateway),
-  // we default to FALSE to avoid showing the book cover again.
+  // If we are landing on the payment callback page (e.g. returning from gateway) or cakenic pages,
+  // we default to FALSE to avoid showing the book cover overlay.
   const [showIntro, setShowIntro] = useState(() => {
-    // Check path for callback. window.location.href ensures we catch it regardless of routing mode initially
-    if (window.location.href.includes('payment/callback')) return false;
+    if (window.location.href.includes('payment/callback') || window.location.href.includes('cakenic')) return false;
     return true;
   });
 
@@ -741,11 +740,12 @@ const App: React.FC = () => {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && p.isLive !== false);
+  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false);
+  const isCakenicPage = pathname.startsWith('/cakenic');
 
   return (
     <>
-      {showIntro && (
+      {showIntro && !isCakenicPage && (
         <IntroOverlay 
            onComplete={() => setShowIntro(false)} 
            coverImage="https://i.postimg.cc/vmfxp5XF/Gemini-Generated-Image-6xc5k56xc5k56xc5-(1).png"
@@ -769,7 +769,7 @@ const App: React.FC = () => {
         {/* Clean URL Product Route (Slug or ID) */}
         <Route path="/product/:slug" element={
           <Layout cartCount={cartCount} products={regularProducts}>
-            <ProductDetails products={products.filter(p => !p.isPosOnly && p.isLive !== false)} onAddToCart={handleAddToCart} />
+            <ProductDetails products={products.filter(p => !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false)} onAddToCart={handleAddToCart} />
           </Layout>
         } />
         

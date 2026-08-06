@@ -21,6 +21,7 @@ export interface Product {
   isCheckoutAddon?: boolean;
   isPosOnly?: boolean;
   isLive?: boolean;
+  isCakenicOnly?: boolean;
   addShippingBox?: boolean;
 }
 
@@ -44,7 +45,7 @@ export interface Order {
   customerPhone: string;
   items: CartItem[];
   total: number;
-  status: 'pending' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'failed' | 'cancelled';
+  status: 'pending' | 'pending_transfer' | 'pending_whatsapp' | 'paid' | 'packed' | 'shipped' | 'delivered' | 'failed' | 'cancelled';
   date: string;
   shippingAddress: string;
   isGift?: boolean;

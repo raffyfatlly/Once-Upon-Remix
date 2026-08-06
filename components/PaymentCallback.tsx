@@ -15,6 +15,7 @@ export const PaymentCallback: React.FC = () => {
     const result = searchParams.get('result');
     const orderId = searchParams.get('order');
     
+    const method = searchParams.get('method');
     if (orderId) setDisplayOrderId(orderId);
     
     const handleCallback = async () => {
@@ -24,6 +25,12 @@ export const PaymentCallback: React.FC = () => {
       }
 
       try {
+        if (method === 'bank_transfer') {
+          await updateOrderStatusInDb(orderId, 'pending_transfer');
+          setStatus('bank_transfer' as any);
+          return;
+        }
+
         if (result === 'success') {
           // Payment Successful: Stock was already deducted at checkout.
           // Just update status to Paid.
@@ -127,6 +134,59 @@ export const PaymentCallback: React.FC = () => {
                 className="text-gray-500 px-6 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:text-gray-900 transition-colors"
               >
                 Return Home
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(status as any) === 'bank_transfer' && (
+          <div className="flex flex-col items-center animate-slide-up">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6">
+              <span className="text-3xl">🏦</span>
+            </div>
+            <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-2">Order Reserved!</h1>
+            {displayOrderId && (
+              <div className="mb-4 bg-brand-grey/10 px-4 py-1 rounded-full text-xs font-mono text-gray-700 font-bold">
+                Order #{displayOrderId}
+              </div>
+            )}
+            <p className="font-sans text-gray-600 mb-6 text-sm leading-relaxed max-w-sm">
+              Please transfer your payment to Maybank to complete your order confirmation:
+            </p>
+
+            <div className="w-full max-w-sm bg-brand-grey/5 p-5 rounded-2xl border border-brand-latte/20 text-left mb-6 space-y-2 text-xs">
+              <div className="flex justify-between border-b border-gray-200 pb-2">
+                <span className="text-gray-500 font-medium">Bank Name:</span>
+                <span className="font-bold text-gray-900">Maybank</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-2">
+                <span className="text-gray-500 font-medium">Account Number:</span>
+                <span className="font-bold text-brand-flamingo font-mono text-sm">562188327902</span>
+              </div>
+              <div className="flex justify-between border-b border-gray-200 pb-2">
+                <span className="text-gray-500 font-medium">Account Name:</span>
+                <span className="font-bold text-gray-900">VANILLICIOUS ENTERPRISE</span>
+              </div>
+              <div className="flex justify-between pt-1">
+                <span className="text-gray-500 font-medium">Payment Reference:</span>
+                <span className="font-bold text-gray-900 font-mono">#{displayOrderId}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 w-full max-w-sm">
+              <a 
+                href={`https://wa.me/60120000000?text=${encodeURIComponent(`Hi Vanillicious team! I have completed payment for Order #${displayOrderId}.\n\nHere is my payment receipt screenshot.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-[#25D366] text-white py-3.5 font-sans uppercase tracking-[0.15em] text-[11px] font-bold hover:bg-[#1ebd53] transition-colors rounded-full flex items-center justify-center gap-2 shadow-md"
+              >
+                Send Receipt on WhatsApp
+              </a>
+              <button 
+                onClick={() => navigate('/')}
+                className="text-gray-500 py-2.5 font-sans uppercase tracking-[0.15em] text-[10px] font-bold hover:text-gray-900 transition-colors"
+              >
+                Return to Store
               </button>
             </div>
           </div>
