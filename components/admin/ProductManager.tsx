@@ -26,8 +26,24 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     const name = (p.name || '').toLowerCase();
     return name.includes('perfume') || name.includes('hair oil') || name.includes('oil');
   };
+  const isCakenicProduct = (p: Product) => {
+    if (!p) return false;
+    const name = (p.name || '').toLowerCase();
+    const collection = (p.collection || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+    const id = (p.id || '').toLowerCase();
+    return Boolean(p.isCakenicOnly) || 
+           name.includes('cakenic') || 
+           name.includes('ticket') || 
+           collection.includes('cakenic') || 
+           collection.includes('ticket') || 
+           category.includes('cakenic') || 
+           category.includes('ticket') || 
+           id.includes('cakenic');
+  };
   const isAddonProduct = (p: Product) => {
     if (!p) return false;
+    if (isCakenicProduct(p)) return false;
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
@@ -40,10 +56,15 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
            category.includes('add-on') || 
            category.includes('addon');
   };
-  const isBlanketProduct = (p: Product) => !p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'));
+  const isBlanketProduct = (p: Product) => {
+    if (!p || isCakenicProduct(p) || isAddonProduct(p)) return false;
+    return !p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'));
+  };
 
   const rawProducts = Array.isArray(products) ? products : [];
   const safeProducts = [...rawProducts].sort((a, b) => {
+    const aIsCakenic = isCakenicProduct(a);
+    const bIsCakenic = isCakenicProduct(b);
     const aIsPerfumeOrOil = isPerfumeOrHairOil(a);
     const bIsPerfumeOrOil = isPerfumeOrHairOil(b);
     const aIsAddon = isAddonProduct(a);
@@ -51,8 +72,8 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     const aIsBlanket = isBlanketProduct(a);
     const bIsBlanket = isBlanketProduct(b);
 
-    const aGroup = aIsPerfumeOrOil ? 3 : (aIsAddon ? 2 : (aIsBlanket ? 1 : 0));
-    const bGroup = bIsPerfumeOrOil ? 3 : (bIsAddon ? 2 : (bIsBlanket ? 1 : 0));
+    const aGroup = aIsCakenic ? 0 : (aIsBlanket ? 1 : (aIsAddon ? 3 : 2));
+    const bGroup = bIsCakenic ? 0 : (bIsBlanket ? 1 : (bIsAddon ? 3 : 2));
 
     if (aGroup !== bGroup) {
       return aGroup - bGroup;
@@ -209,21 +230,25 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         adultSizeDesc: '150 cm x 150 cm'
       },
       {
+        id: 'cakenic-ticket-putrajaya',
         name: 'Cakenic Putrajaya',
         price: 68,
-        description: 'Join us under the lush trees of Putrajaya for an unforgettable afternoon of cake sharing, picnic vibes, and sweet memories. Secret Garden Park, Putrajaya.',
+        description: 'Join us at Taman Botani Putrajaya (Theme: European Classical) for an unforgettable afternoon of cake sharing, picnic vibes, and sweet memories. Saturday, September 12, 2026.',
         image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
         collection: 'Cakenic Ticket',
+        isCakenicOnly: true,
         stock: 45
       },
       {
-        name: 'Cakenic Johor Bahru',
-        price: 2,
-        description: 'An exclusive Southern Cakenic gathering featuring curated gift bags, prizes, and a dream botanical picnic setting. Eco Spring Botanic Garden, JB.',
+        id: 'cakenic-ticket-johor',
+        name: 'Cakenic JOHOR',
+        price: 88,
+        description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden (Theme: Rocco Garden) featuring curated gift bags, prizes, and a dream botanical picnic setting. Saturday, October 24, 2026.',
         image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
         collection: 'Cakenic Ticket',
+        isCakenicOnly: true,
         stock: 30
       }
     ];
@@ -605,8 +630,9 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
           )}
           {safeProducts.map(product => {
             const isAddon = isAddonProduct(product);
-            const isBlanket = !isAddon && (!product.collection || product.collection === 'Blankets' || product.collection.toLowerCase().includes('blanket') || (product.category && product.category.toLowerCase().includes('blanket')));
-            const collectionTag = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+            const isCakenic = isCakenicProduct(product);
+            const isBlanket = isBlanketProduct(product);
+            const collectionTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
             return (
               <div key={product.id} className="bg-white border border-brand-latte/20 p-4 flex gap-4 items-center group rounded-[2px] shadow-sm">
                 <img src={product.image} alt={product.name} className="w-16 h-16 md:w-20 md:h-20 object-cover bg-gray-100 rounded-[2px]" />
@@ -614,11 +640,13 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <h4 className="font-serif text-base md:text-lg text-gray-900 leading-tight truncate">{product.name}</h4>
                     <span className={`text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 rounded tracking-wider border ${
-                      isAddon 
-                        ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                        : isBlanket 
-                          ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                          : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                      isCakenic
+                        ? 'bg-rose-100 text-rose-800 border-rose-200'
+                        : isAddon 
+                          ? 'bg-gray-100 text-gray-500 border-gray-200' 
+                          : isBlanket 
+                            ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                            : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                     }`}>
                       {collectionTag}
                     </span>

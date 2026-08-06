@@ -68,9 +68,31 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
   }
 ];
 
-export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToCart }) => {
+export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToCart, products = [] }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // Dynamically map ticket prices and details from products in Admin
+  const locations = React.useMemo(() => {
+    return CAKENIC_LOCATIONS.map(loc => {
+      const matched = products.find(p => {
+        if (p.id === loc.id) return true;
+        const nameLower = (p.name || '').toLowerCase();
+        if (loc.id.includes('putrajaya') && nameLower.includes('putrajaya')) return true;
+        if (loc.id.includes('johor') && (nameLower.includes('johor') || nameLower.includes('jb'))) return true;
+        return false;
+      });
+      if (matched) {
+        return {
+          ...loc,
+          price: typeof matched.price === 'number' ? matched.price : loc.price,
+          availableSlots: matched.stock !== undefined ? matched.stock : loc.availableSlots,
+          description: matched.description || loc.description
+        };
+      }
+      return loc;
+    });
+  }, [products]);
 
   // Selected Ticket & Checkout Drawer State
   const [selectedTicket, setSelectedTicket] = useState<CakenicLocationTicket | null>(null);
@@ -358,7 +380,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
           <div className="absolute -inset-4 bg-white/70 blur-2xl rounded-[40px] pointer-events-none -z-10" />
 
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 relative z-10">
-            {CAKENIC_LOCATIONS.map((loc) => (
+            {locations.map((loc) => (
               <div
                 key={loc.id}
                 onClick={() => handleOpenCheckout(loc)}

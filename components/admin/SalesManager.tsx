@@ -1111,8 +1111,9 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
             <tbody>
               ${order.items.map(item => {
                 const isAddon = Boolean(item.isCheckoutAddon);
-                const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
-                const itemCollection = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+                const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
+                const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+                const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                 return `
                   <tr>
                     <td>
@@ -1719,9 +1720,9 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                             <div className="text-xs text-gray-600">
                                 {order.items.map(i => {
                                     const isAddon = Boolean(i.isCheckoutAddon);
-                                    const isCakenicTicket = i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic'));
+                                    const isCakenicTicket = i.collection === 'Cakenic Ticket' || i.collection === 'Event' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && (i.id.includes('cakenic') || i.id.includes('ticket')));
                                     const isBlanket = !isCakenicTicket && (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket')));
-                                    const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket' : 'Swaddle'));
+                                    const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                                     return (
                                         <div key={i.id} className="mb-1.5 flex items-center gap-1 flex-wrap">
                                             <span>{i.quantity}x {i.name}</span>
@@ -1808,9 +1809,9 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                     <div className="space-y-4">
                                     {order.items.map((item, idx) => {
                                         const isAddon = Boolean(item.isCheckoutAddon);
-                                        const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && item.id.startsWith('cakenic'));
+                                        const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
                                         const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
-                                        const itemCollection = isAddon ? 'Add-on' : (isCakenicTicket ? 'Cakenic Ticket' : (isBlanket ? 'Blanket Collection' : 'Swaddle Collection'));
+                                        const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                                         return (
                                             <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-[2px] border border-brand-latte/20">
                                                 <img src={item.image} className="w-12 h-16 object-cover bg-gray-100" />

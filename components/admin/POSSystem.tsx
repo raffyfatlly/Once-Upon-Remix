@@ -641,7 +641,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const [selectedSizeProduct, setSelectedSizeProduct] = useState<Product | null>(null);
 
   // Category selection / filter state
-  const [activeCategory, setActiveCategory] = useState<'all' | 'swaddles' | 'blankets' | 'addons'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'swaddles' | 'blankets' | 'events' | 'addons'>('all');
 
   // Mobile optimization states
   const [activeMobileTab, setActiveMobileTab] = useState<'products' | 'cart'>('products');
@@ -657,12 +657,30 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const [customDiscountValue, setCustomDiscountValue] = useState(10);
 
   // Category helpers
+  const isCakenicTicketProduct = (p: Product | CartItem) => {
+    if (!p) return false;
+    const name = (p.name || '').toLowerCase();
+    const collection = (p.collection || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+    const id = (p.id || '').toLowerCase();
+    return Boolean(p.isCakenicOnly) || 
+           name.includes('cakenic') || 
+           name.includes('ticket') || 
+           collection.includes('cakenic') || 
+           collection.includes('ticket') || 
+           collection.includes('event') || 
+           category.includes('cakenic') || 
+           category.includes('ticket') || 
+           category.includes('event') || 
+           id.includes('cakenic');
+  };
   const isPerfumeOrHairOil = (p: Product) => {
+    if (!p || isCakenicTicketProduct(p)) return false;
     const name = (p.name || '').toLowerCase();
     return name.includes('perfume') || name.includes('hair oil') || name.includes('oil');
   };
   const isAddonProduct = (p: Product) => {
-    if (!p) return false;
+    if (!p || isCakenicTicketProduct(p)) return false;
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
@@ -675,20 +693,21 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
            category.includes('add-on') || 
            category.includes('addon');
   };
-  const isCakenicTicketProduct = (p: Product | CartItem) => p.collection === 'Cakenic Ticket' || p.category === 'Event Ticket' || Boolean(p.isCakenicOnly) || (p.id && p.id.startsWith('cakenic'));
-  const isBlanketProduct = (p: Product | CartItem) => !isCakenicTicketProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+  const isBlanketProduct = (p: Product | CartItem) => !isCakenicTicketProduct(p) && !isAddonProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
 
-  const swaddles = products.filter(p => !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
-  const blankets = products.filter(p => !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
+  const swaddles = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
+  const blankets = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
 
   // Category counts
-  const swaddlesCount = products.filter(p => !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
-  const blanketsCount = products.filter(p => !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
-  const addonsCount = products.filter(p => (isAddonProduct(p) || isPerfumeOrHairOil(p)) && p.isLive !== false).length;
+  const swaddlesCount = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
+  const blanketsCount = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
+  const eventsCount = products.filter(p => isCakenicTicketProduct(p) && p.isLive !== false).length;
+  const addonsCount = products.filter(p => !isCakenicTicketProduct(p) && (isAddonProduct(p) || isPerfumeOrHairOil(p)) && p.isLive !== false).length;
 
-  // Sort POS products: First Swaddles (not addon, not blanket), then Blankets (not addon, is blanket), then Add-ons (is addon), then Perfume/Hair Oil (absolutely last)
-  // Each group sorted alphabetically A-Z (top to bottom) by name
+  // Sort POS products: First Swaddles (0), then Blankets (1), then Events (2), then Add-ons (3)
   const sortedProducts = [...products].sort((a, b) => {
+    const aIsCakenic = isCakenicTicketProduct(a);
+    const bIsCakenic = isCakenicTicketProduct(b);
     const aIsPerfumeOrOil = isPerfumeOrHairOil(a);
     const bIsPerfumeOrOil = isPerfumeOrHairOil(b);
     const aIsAddon = isAddonProduct(a);
@@ -696,8 +715,8 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
     const aIsBlanket = isBlanketProduct(a);
     const bIsBlanket = isBlanketProduct(b);
 
-    const aGroup = aIsPerfumeOrOil ? 3 : (aIsAddon ? 2 : (aIsBlanket ? 1 : 0));
-    const bGroup = bIsPerfumeOrOil ? 3 : (bIsAddon ? 2 : (bIsBlanket ? 1 : 0));
+    const aGroup = aIsCakenic ? 2 : (aIsPerfumeOrOil || aIsAddon ? 3 : (aIsBlanket ? 1 : 0));
+    const bGroup = bIsCakenic ? 2 : (bIsPerfumeOrOil || bIsAddon ? 3 : (bIsBlanket ? 1 : 0));
 
     if (aGroup !== bGroup) {
       return aGroup - bGroup;
@@ -709,13 +728,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   // Filter products by active category
   const displayedProducts = sortedProducts.filter(p => {
     if (activeCategory === 'swaddles') {
-      return !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p);
+      return !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p);
     }
     if (activeCategory === 'blankets') {
-      return !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p);
+      return !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p);
+    }
+    if (activeCategory === 'events') {
+      return isCakenicTicketProduct(p);
     }
     if (activeCategory === 'addons') {
-      return isAddonProduct(p) || isPerfumeOrHairOil(p);
+      return !isCakenicTicketProduct(p) && (isAddonProduct(p) || isPerfumeOrHairOil(p));
     }
     return true; // 'all'
   });
@@ -1026,9 +1048,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
 
           <div className={`space-y-4 mb-6 md:mb-8 max-h-[40vh] overflow-y-auto pr-4 ${showCheckoutItems ? 'block' : 'hidden md:block'}`}>
             {cart.map(item => {
+              const isCakenic = isCakenicTicketProduct(item);
               const isAddon = Boolean(item.isCheckoutAddon);
               const isBlanket = isBlanketProduct(item);
-              const itemTag = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+              const itemTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
               return (
                 <div key={item.id} className="flex justify-between items-center py-2 border-b border-brand-latte/10">
                   <div className="flex gap-3 md:gap-4 items-center flex-1">
@@ -1039,11 +1062,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                       <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
                         <p className="font-bold text-xs md:text-sm text-gray-900">{item.name}</p>
                         <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded tracking-widest border ${
-                          isAddon 
-                            ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                            : isBlanket 
-                              ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                              : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                          isCakenic
+                            ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
+                            : isAddon 
+                              ? 'bg-gray-100 text-gray-500 border-gray-200' 
+                              : isBlanket 
+                                ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                         }`}>
                           {itemTag}
                         </span>
@@ -1349,7 +1374,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
           </div>
 
           {/* CATEGORY CARD SELECTORS */}
-          <div id="pos-category-selector" className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 md:gap-3 mb-6">
+          <div id="pos-category-selector" className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 md:gap-3 mb-6">
             <button
               id="pos-cat-swaddles"
               type="button"
@@ -1378,6 +1403,21 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               <span className="text-lg mb-1">🧸</span>
               <span className="font-serif text-xs font-semibold">Blankets</span>
               <span className="text-[9px] font-mono mt-1 opacity-70 bg-brand-gold/10 text-brand-gold px-2 py-0.5 rounded-full">{blanketsCount} Designs</span>
+            </button>
+
+            <button
+              id="pos-cat-events"
+              type="button"
+              onClick={() => setActiveCategory('events')}
+              className={`p-2.5 md:p-3 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                activeCategory === 'events'
+                  ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm scale-[1.02] ring-1 ring-rose-500/50'
+                  : 'border-brand-latte/20 bg-white hover:border-rose-300 text-gray-700 hover:bg-gray-50/50'
+              }`}
+            >
+              <span className="text-lg mb-1">🎟️</span>
+              <span className="font-serif text-xs font-semibold">Events</span>
+              <span className="text-[9px] font-mono mt-1 opacity-70 bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">{eventsCount} Tickets</span>
             </button>
 
             <button
@@ -1413,9 +1453,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
             {displayedProducts.map(product => {
+              const isCakenic = isCakenicTicketProduct(product);
               const isAddon = isAddonProduct(product) || isPerfumeOrHairOil(product);
               const isBlanket = isBlanketProduct(product);
-              const collectionTag = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+              const collectionTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
               return (
                 <button 
                   key={product.id} 
@@ -1432,11 +1473,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                     <img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                       <span className={`text-[8px] font-sans font-bold px-1.5 py-0.5 uppercase tracking-widest rounded-sm ${
-                        isAddon 
-                          ? 'bg-gray-100 text-gray-600 border border-gray-200' 
-                          : isBlanket 
-                            ? 'bg-brand-gold text-white' 
-                            : 'bg-brand-flamingo text-white'
+                        isCakenic
+                          ? 'bg-rose-600 text-white font-extrabold'
+                          : isAddon 
+                            ? 'bg-gray-100 text-gray-600 border border-gray-200' 
+                            : isBlanket 
+                              ? 'bg-brand-gold text-white' 
+                              : 'bg-brand-flamingo text-white'
                       }`}>
                         {collectionTag}
                       </span>
@@ -1498,9 +1541,10 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               </div>
             ) : (
               cart.map(item => {
+                const isCakenic = isCakenicTicketProduct(item);
                 const isAddon = isAddonProduct(item) || isPerfumeOrHairOil(item);
                 const isBlanket = isBlanketProduct(item);
-                const itemTag = isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle');
+                const itemTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
                 return (
                   <div key={item.id} className="flex flex-col gap-2 p-3 border border-brand-latte/20 rounded bg-gray-50">
                     <div className="flex justify-between items-start">
@@ -1508,11 +1552,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-xs text-gray-900 leading-tight">{item.name}</span>
                           <span className={`text-[7px] font-bold uppercase px-1 py-0.2 rounded border whitespace-nowrap ${
-                            isAddon 
-                              ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                              : isBlanket 
-                                ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                                : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                            isCakenic
+                              ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
+                              : isAddon 
+                                ? 'bg-gray-100 text-gray-500 border-gray-200' 
+                                : isBlanket 
+                                  ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                  : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                           }`}>
                             {itemTag}
                           </span>
