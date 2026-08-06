@@ -25,6 +25,7 @@ import { Product, SiteConfig, CartItem, Order, Ambassador } from './types';
 import { Star, Cloud, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { subscribeToProducts, subscribeToOrders } from './firebase';
 import { initializeAnalytics, trackAddToCart } from './analytics';
+import { PRODUCTS } from './constants';
 
 const SectionDivider = () => (
   <div className="flex items-center justify-center gap-4 py-8 opacity-40">
@@ -445,8 +446,17 @@ const StoreFront: React.FC<{
 const App: React.FC = () => {
   const { pathname } = useLocation();
   
-  // Data State
-  const [products, setProducts] = useState<Product[]>([]);
+  // Data State with instant cache restoration
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const cached = localStorage.getItem('ou_products_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return PRODUCTS;
+  });
   const [orders, setOrders] = useState<Order[]>([]);
   
   // PWA Install Prompt State
@@ -506,7 +516,12 @@ const App: React.FC = () => {
   // --- FIREBASE SUBSCRIPTIONS ---
   useEffect(() => {
     const unsubscribeProducts = subscribeToProducts((fetchedProducts) => {
-      setProducts(fetchedProducts);
+      if (fetchedProducts && fetchedProducts.length > 0) {
+        setProducts(fetchedProducts);
+        try {
+          localStorage.setItem('ou_products_cache', JSON.stringify(fetchedProducts));
+        } catch (e) {}
+      }
     });
     const unsubscribeOrders = subscribeToOrders((fetchedOrders) => {
       setOrders(fetchedOrders);

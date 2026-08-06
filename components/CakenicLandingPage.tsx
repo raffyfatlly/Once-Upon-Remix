@@ -47,7 +47,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     price: 68,
     badge: 'Popular Location',
     image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
-    availableSlots: 45,
+    availableSlots: 0,
     description: 'Join us at Taman Botani Putrajaya for an elegant European Classical themed afternoon of cake sharing, picnic vibes, and sweet memories.'
   },
   {
@@ -63,7 +63,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     badge: 'Limited Spots',
     popular: true,
     image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
-    availableSlots: 30,
+    availableSlots: 0,
     description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden with a grand Rocco Garden theme, featuring curated gift bags, prizes, and a dream botanical picnic setting.'
   }
 ];

@@ -31,7 +31,7 @@ export const PRODUCTS: Product[] = [
     category: 'Event Ticket',
     collection: 'Cakenic Ticket',
     isCakenicOnly: true,
-    stock: 45
+    stock: 0
   },
   {
     id: 'cakenic-ticket-johor',
@@ -42,7 +42,7 @@ export const PRODUCTS: Product[] = [
     category: 'Event Ticket',
     collection: 'Cakenic Ticket',
     isCakenicOnly: true,
-    stock: 30
+    stock: 0
   },
 ];
 
