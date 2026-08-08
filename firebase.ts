@@ -52,8 +52,20 @@ export const subscribeToProducts = (callback: (products: Product[]) => void) => 
   try {
     const q = query(collection(db, 'products'), orderBy('name'));
     return onSnapshot(q, (snapshot) => {
-      const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
-      callback(products);
+      const rawProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
+      const cleanProducts: Product[] = [];
+      rawProducts.forEach(p => {
+        const isProtectedDuplicate = p.id.endsWith('-protected') || 
+                                     (p.name && p.name.includes('+ Extra Protection Box')) ||
+                                     (p.name && p.name.includes('Extra Protection Box'));
+        if (isProtectedDuplicate) {
+          console.warn(`Removing auto-created protection box duplicate product from Firestore: ${p.id} (${p.name})`);
+          deleteProductFromDb(p.id).catch(err => console.error("Error deleting duplicate product doc:", err));
+        } else {
+          cleanProducts.push(p);
+        }
+      });
+      callback(cleanProducts);
     }, (error) => {
       console.error("Error fetching products:", error);
       callback([]); 
@@ -100,8 +112,10 @@ export const createOrderInDb = async (orderData: Omit<Order, 'id'>) => {
     
     // 2. STOCK CHECK: Read all product documents involved in the order first
     const productReads = orderData.items.map(item => {
-      // Use baseProductId if it's a size variant to locate the original document
-      const docId = item.baseProductId || item.id;
+      let docId = item.baseProductId || item.id;
+      if (typeof docId === 'string' && docId.endsWith('-protected')) {
+        docId = docId.replace(/-protected$/, '');
+      }
       const ref = doc(db, 'products', docId);
       return { ref, id: docId, qty: item.quantity };
     });
@@ -139,15 +153,23 @@ export const createOrderInDb = async (orderData: Omit<Order, 'id'>) => {
         const newStock = currentStock - requestedItem.qty;
         transaction.update(requestedItem.ref, { stock: newStock });
       } else {
-        const itemInfo = orderData.items.find(i => (i.baseProductId || i.id) === requestedItem.id);
-        transaction.set(requestedItem.ref, {
-          name: itemInfo?.name || requestedItem.id,
-          price: itemInfo?.price || 0,
-          stock: 50 - requestedItem.qty,
-          category: itemInfo?.category || 'Event Ticket',
-          collection: itemInfo?.collection || 'Cakenic Ticket',
-          image: itemInfo?.image || ''
+        const itemInfo = orderData.items.find(i => {
+          const rawId = i.baseProductId || i.id;
+          return rawId.replace(/-protected$/, '') === requestedItem.id;
         });
+        const isTicket = itemInfo?.collection === 'Cakenic Ticket' || itemInfo?.category === 'Event Ticket' || Boolean(itemInfo?.isCakenicOnly) || requestedItem.id.startsWith('cakenic');
+        if (isTicket) {
+          transaction.set(requestedItem.ref, {
+            name: itemInfo?.name || requestedItem.id,
+            price: itemInfo?.price || 0,
+            stock: 50 - requestedItem.qty,
+            category: itemInfo?.category || 'Event Ticket',
+            collection: itemInfo?.collection || 'Cakenic Ticket',
+            image: itemInfo?.image || ''
+          });
+        } else {
+          console.warn(`Product ${requestedItem.id} not found in DB during stock deduction. Skipping auto-creation.`);
+        }
       }
     });
 
@@ -197,7 +219,10 @@ export const restoreStockForOrder = async (orderId: string, newStatus: 'cancelle
 
     // 2. Read all Product Docs involved
     const productReads = orderData.items.map(item => {
-      const docId = item.baseProductId || item.id;
+      let docId = item.baseProductId || item.id;
+      if (typeof docId === 'string' && docId.endsWith('-protected')) {
+        docId = docId.replace(/-protected$/, '');
+      }
       const ref = doc(db, 'products', docId);
       return { ref, qty: item.quantity };
     });

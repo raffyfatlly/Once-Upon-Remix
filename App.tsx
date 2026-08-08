@@ -685,6 +685,13 @@ const App: React.FC = () => {
     });
   };
 
+  const isProtectionDuplicate = (p: Product) => {
+    if (!p) return false;
+    const id = p.id || '';
+    const name = p.name || '';
+    return id.endsWith('-protected') || name.includes('+ Extra Protection Box') || name.includes('Extra Protection Box');
+  };
+
   const handleToggleShippingBox = (itemId: string, addBox: boolean) => {
     setCart(prev => {
       const itemToUpdate = prev.find(item => item.id === itemId);
@@ -693,16 +700,16 @@ const App: React.FC = () => {
       const hasBox = itemToUpdate.id.endsWith('-protected') || !!itemToUpdate.addShippingBox;
       if (hasBox === addBox) return prev;
 
+      const baseProductId = itemToUpdate.baseProductId || itemToUpdate.id.replace(/-protected$/, '');
+
       let targetId = itemToUpdate.id;
       let targetName = itemToUpdate.name;
       let targetPrice = itemToUpdate.price;
 
       if (addBox) {
-        // Find if base ID is already defined or derive it
-        const baseId = itemToUpdate.baseProductId || itemToUpdate.id;
-        targetId = `${baseId}-protected`;
+        targetId = `${baseProductId}-protected`;
         if (itemToUpdate.sizeOption) {
-          targetId = `${baseId}-${itemToUpdate.sizeOption}-protected`;
+          targetId = `${baseProductId}-${itemToUpdate.sizeOption}-protected`;
         }
         if (!targetName.includes(' + Extra Protection Box')) {
           targetName = `${targetName} + Extra Protection Box`;
@@ -710,7 +717,10 @@ const App: React.FC = () => {
         targetPrice = itemToUpdate.price + 2;
       } else {
         // Strip out protected suffix
-        targetId = itemToUpdate.id.replace('-protected', '');
+        targetId = baseProductId;
+        if (itemToUpdate.sizeOption) {
+          targetId = `${baseProductId}-${itemToUpdate.sizeOption}`;
+        }
         targetName = itemToUpdate.name.replace(' + Extra Protection Box', '');
         targetPrice = Math.max(0, itemToUpdate.price - 2);
       }
@@ -738,7 +748,8 @@ const App: React.FC = () => {
               id: targetId,
               name: targetName,
               price: targetPrice,
-              addShippingBox: addBox
+              addShippingBox: addBox,
+              baseProductId: baseProductId
             };
           }
           return item;
@@ -753,7 +764,7 @@ const App: React.FC = () => {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false');
+  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false' && !isProtectionDuplicate(p));
   const isCakenicPage = pathname.startsWith('/cakenic');
 
   return (
@@ -782,7 +793,7 @@ const App: React.FC = () => {
         {/* Clean URL Product Route (Slug or ID) */}
         <Route path="/product/:slug" element={
           <Layout cartCount={cartCount} products={regularProducts}>
-            <ProductDetails products={products.filter(p => !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false')} onAddToCart={handleAddToCart} />
+            <ProductDetails products={products.filter(p => !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false' && !isProtectionDuplicate(p))} onAddToCart={handleAddToCart} />
           </Layout>
         } />
         
