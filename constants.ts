@@ -53,3 +53,21 @@ export const NAVIGATION_LINKS = [
   { name: 'Our Story', href: '/story' },
   { name: 'Collections', href: '#collections' },
 ];
+
+export const getProductSlug = (p: Product | string) => {
+  if (!p) return '';
+  if (typeof p === 'string') {
+    return p.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+  }
+  const nameSlug = (p.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+  if (!nameSlug) return p.id || '';
+
+  const isBlanket = (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+  const group = isBlanket ? 'blanket' : 'swaddle';
+
+  if (nameSlug.endsWith('-blanket') || nameSlug.endsWith('-swaddle')) {
+    return nameSlug;
+  }
+
+  return `${nameSlug}-${group}`;
+};

@@ -4,9 +4,7 @@ import { getCustomerOrders, getOrderById } from '../firebase';
 import { Order } from '../types';
 import { Search, Loader2, Package, Calendar, AlertCircle, ArrowRight, Truck, CheckCircle, CreditCard, MessageCircle, ExternalLink, Box } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-// Helper for SEO URLs
-const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
+import { getProductSlug } from '../constants';
 
 const OrderStatusStepper = ({ status }: { status: string }) => {
   if (status === 'cancelled' || status === 'failed') {

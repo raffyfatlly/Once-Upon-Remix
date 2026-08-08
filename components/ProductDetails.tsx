@@ -5,13 +5,12 @@ import { ArrowLeft, Minus, Plus, ShoppingBag, Truck, Info, Leaf, Loader2, Check,
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProductCard } from './ProductCard';
 import { trackViewItem } from '../analytics';
+import { getProductSlug } from '../constants';
 
 interface ProductDetailsProps {
   products: Product[];
   onAddToCart: (product: Product, quantity: number) => void;
 }
-
-const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
 const AccordionItem: React.FC<{ title: string; children: React.ReactNode; isOpen: boolean; toggle: () => void }> = ({ title, children, isOpen, toggle }) => (
   <div className="border-b border-brand-latte/20">
@@ -42,10 +41,35 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
 
   useEffect(() => {
     if (products.length > 0 && slug) {
-      let found = products.find(p => getProductSlug(p.name) === slug);
+      // 1. Try exact product ID first
+      let found = products.find(p => p.id === slug);
+      
+      // 2. Try exact getProductSlug(p)
       if (!found) {
-        found = products.find(p => p.id === slug);
+        found = products.find(p => getProductSlug(p) === slug);
       }
+
+      // 3. Match considering blanket/swaddle filter if slug specifies it
+      if (!found) {
+        const wantsBlanket = slug.includes('blanket');
+        const wantsSwaddle = slug.includes('swaddle');
+
+        found = products.find(p => {
+          const isBlanket = (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+          if (wantsBlanket && !isBlanket) return false;
+          if (wantsSwaddle && isBlanket) return false;
+
+          const pSlug = getProductSlug(p);
+          const nameOnlySlug = getProductSlug(p.name);
+          return pSlug === slug || nameOnlySlug === slug || slug.startsWith(nameOnlySlug);
+        });
+      }
+
+      // 4. Fallback exact name slug match
+      if (!found) {
+        found = products.find(p => getProductSlug(p.name) === slug);
+      }
+
       setProduct(found);
       if (found) setActiveImage(found.image);
       setLoading(false);
@@ -149,7 +173,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
 
   // Filter out any checkout addon or wellness addon products so we only recommend premium main products (swaddles or blankets)
   const isAddonProduct = (p: Product) => Boolean(p.isCheckoutAddon) || (p.name || '').toLowerCase().includes('perfume') || (p.name || '').toLowerCase().includes('hair oil') || (p.name || '').toLowerCase().includes('oil');
-  const mainProducts = products.filter(p => p.isLive !== false && !isAddonProduct(p) && p.id !== product.id && getProductSlug(p.name) !== slug);
+  const mainProducts = products.filter(p => p.isLive !== false && !isAddonProduct(p) && p.id !== product.id && getProductSlug(p) !== slug);
 
   // Dynamic image lookups for collection navigation cards
   const blanketImage = products.find(p => !isAddonProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'))))?.image;
@@ -338,7 +362,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                     key={p.id} 
                     onClick={() => {
                       setQuantity(1);
-                      navigate(`/product/${getProductSlug(p.name)}`);
+                      navigate(`/product/${getProductSlug(p)}`);
                     }}
                     className={`group cursor-pointer flex flex-col ${index === 2 ? 'hidden md:flex' : 'flex'}`}
                   >

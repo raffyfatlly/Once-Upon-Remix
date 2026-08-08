@@ -2,16 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShoppingBag, Menu, X, Star, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { NAVIGATION_LINKS } from '../constants';
+import { NAVIGATION_LINKS, getProductSlug } from '../constants';
 import { Product } from '../types';
 
 interface NavbarProps {
   cartCount: number;
   products: Product[];
 }
-
-// Helper to generate slug for URL (duplicating to keep component independent or could import)
-const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
 export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
   const [isScrolled, setIsScrolled] = useState(false);

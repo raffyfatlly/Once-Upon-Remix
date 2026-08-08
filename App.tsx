@@ -18,6 +18,7 @@ import { IntroOverlay } from './components/IntroOverlay';
 import { OurStory } from './components/OurStory';
 import { RefundPolicy, ShippingPolicy, PrivacyPolicy, TermsPolicy, BusinessInfoPolicy } from './components/Policies';
 import { LinkRedirector } from './components/LinkRedirector';
+import { getProductSlug } from './constants';
 import { AmbassadorLogin } from './components/AmbassadorLogin';
 import { AmbassadorDashboard } from './components/AmbassadorDashboard';
 import { CakenicLandingPage } from './components/CakenicLandingPage';
@@ -55,9 +56,6 @@ const REVIEWS = [
     location: "Penang"
   }
 ];
-
-// Helper for SEO URLs
-const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
 // Layout Component wrapping Navbar and Footer
 const Layout: React.FC<{ 
@@ -350,7 +348,7 @@ const StoreFront: React.FC<{
                           <ProductCard 
                             product={product} 
                             onAddToCart={(p, qty) => onAddToCart(p, qty)}
-                            onClick={(p) => navigate(`/product/${getProductSlug(p.name)}`)}
+                            onClick={(p) => navigate(`/product/${getProductSlug(p)}`)}
                             index={index}
                           />
                         </div>

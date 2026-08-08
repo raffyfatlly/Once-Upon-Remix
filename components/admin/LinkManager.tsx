@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../../types';
 import { db } from '../../firebase';
+import { getProductSlug } from '../../constants';
 import { 
   collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, limit 
 } from 'firebase/firestore';
@@ -79,19 +80,12 @@ export const LinkManager: React.FC<LinkManagerProps> = ({ products }) => {
     return () => unsubscribe();
   }, []);
 
-  // Compute clean URLs
-  const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-
-  const getBaseUrl = () => {
-    return window.location.origin;
-  };
-
   const getDestinationPath = () => {
     if (destination === 'homepage') {
       return '/';
     } else {
       const prod = products.find(p => p.id === selectedProductId);
-      return prod ? `/product/${getProductSlug(prod.name)}` : '/';
+      return prod ? `/product/${getProductSlug(prod)}` : '/';
     }
   };
 
@@ -235,7 +229,7 @@ export const LinkManager: React.FC<LinkManagerProps> = ({ products }) => {
       if (parts.length > 1) {
         const slugAndParams = parts[1];
         const slug = slugAndParams.split('?')[0];
-        const foundProd = products.find(p => getProductSlug(p.name) === slug);
+        const foundProd = products.find(p => p.id === slug || getProductSlug(p) === slug || getProductSlug(p.name) === slug);
         if (foundProd) {
           setSelectedProductId(foundProd.id);
         }

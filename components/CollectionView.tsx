@@ -4,14 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { AlertCircle, Star, Sparkles, Instagram } from 'lucide-react';
+import { getProductSlug } from '../constants';
 
 interface CollectionViewProps {
   products: Product[];
   onAddToCart: (product: Product, quantity: number) => void;
 }
-
-// Helper for SEO URLs (can be imported, keeping here for file consistency)
-const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
 
 const SectionDivider = () => (
   <div className="flex items-center justify-center gap-4 py-8 opacity-40">
@@ -118,7 +116,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                   key={product.id} 
                   product={product} 
                   onAddToCart={(p, qty) => onAddToCart(p, qty)}
-                  onClick={(p) => navigate(`/product/${getProductSlug(p.name)}`)}
+                  onClick={(p) => navigate(`/product/${getProductSlug(p)}`)}
                   index={index}
                 />
               ))}
