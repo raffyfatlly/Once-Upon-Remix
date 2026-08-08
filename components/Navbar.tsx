@@ -220,11 +220,11 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
                                </Link>
                                {/* Individual Product Links */}
                                {products
-                                 .filter(p => (p.collection || 'Blankets') === collection)
+                                 .filter(p => getProductGroup(p) === collection)
                                  .map(product => (
                                    <Link
                                      key={product.id}
-                                     to={`/product/${getProductSlug(product.name)}`}
+                                     to={`/product/${getProductSlug(product)}`}
                                      onClick={handleMobileLinkClick}
                                      className="font-sans text-xs text-gray-400 hover:text-gray-900 uppercase tracking-wider"
                                    >

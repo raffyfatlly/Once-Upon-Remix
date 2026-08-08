@@ -14,7 +14,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: '2',
-    name: 'The Parisian Flight (Balloon Ride Blanket)',
+    name: 'The Parisian Flight',
     price: 145,
     description: 'A majestic voyage begins. Vintage hot air balloons drifting over Parisian rooftops. A delicate blend of organic cotton and silk, finished with a refined latte border.',
     image: 'https://picsum.photos/seed/vintage-balloon/600/800',
