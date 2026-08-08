@@ -34,10 +34,10 @@ export const CartView: React.FC<CartViewProps> = ({
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
+    const isOilProduct = /\bhair oil\b|\bbody oil\b|\bessential oil\b|\bperfume oil\b|\boil\b/.test(name);
     return Boolean(p.isCheckoutAddon) || 
            name.includes('perfume') || 
-           name.includes('hair oil') || 
-           name.includes('oil') || 
+           isOilProduct || 
            collection.includes('add-on') || 
            collection.includes('addon') || 
            category.includes('add-on') || 

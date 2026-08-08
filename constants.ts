@@ -14,13 +14,15 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: '2',
-    name: 'The Parisian Flight',
+    name: 'The Parisian Flight (Balloon Ride Blanket)',
     price: 145,
     description: 'A majestic voyage begins. Vintage hot air balloons drifting over Parisian rooftops. A delicate blend of organic cotton and silk, finished with a refined latte border.',
     image: 'https://picsum.photos/seed/vintage-balloon/600/800',
     material: '80% Organic Cotton, 20% Mulberry Silk',
     care: 'Machine wash delicate cycle in laundry bag. Tumble dry low.',
-    stock: 50
+    stock: 50,
+    collection: 'Blankets',
+    isLive: true
   },
   {
     id: 'cakenic-ticket-putrajaya',

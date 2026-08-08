@@ -27,7 +27,11 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
   const collectionName = name ? decodeURIComponent(name) : '';
 
   const getProductGroup = (product: Product) => {
-    return product.category?.trim() || product.collection || 'Blankets';
+    const raw = product.category?.trim() || product.collection || 'Blankets';
+    const lower = raw.toLowerCase();
+    if (lower.includes('blanket')) return 'Blankets';
+    if (lower.includes('swaddle')) return 'Swaddle';
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
   const filteredProducts = products.filter(p => getProductGroup(p) === collectionName);

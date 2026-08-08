@@ -576,10 +576,10 @@ const App: React.FC = () => {
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
+    const isOilProduct = /\bhair oil\b|\bbody oil\b|\bessential oil\b|\bperfume oil\b|\boil\b/.test(name);
     return Boolean(p.isCheckoutAddon) || 
            name.includes('perfume') || 
-           name.includes('hair oil') || 
-           name.includes('oil') || 
+           isOilProduct || 
            collection.includes('add-on') || 
            collection.includes('addon') || 
            category.includes('add-on') || 
@@ -755,7 +755,7 @@ const App: React.FC = () => {
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false);
+  const regularProducts = products.filter(p => !isAddonProduct(p) && !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false');
   const isCakenicPage = pathname.startsWith('/cakenic');
 
   return (
@@ -784,7 +784,7 @@ const App: React.FC = () => {
         {/* Clean URL Product Route (Slug or ID) */}
         <Route path="/product/:slug" element={
           <Layout cartCount={cartCount} products={regularProducts}>
-            <ProductDetails products={products.filter(p => !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false)} onAddToCart={handleAddToCart} />
+            <ProductDetails products={products.filter(p => !p.isPosOnly && !p.isCakenicOnly && p.isLive !== false && (p as any).isLive !== 'false')} onAddToCart={handleAddToCart} />
           </Layout>
         } />
         
