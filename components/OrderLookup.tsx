@@ -381,7 +381,7 @@ export const OrderLookup: React.FC = () => {
                                       <div className="bg-white border border-brand-latte/10 rounded-[2px] p-3 mb-4">
                                         <p className="text-[10px] text-gray-500 leading-relaxed mb-1.5 flex items-start gap-2">
                                           <span className="bg-brand-grey/20 text-gray-500 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[8px] flex-shrink-0 mt-0.5">1</span>
-                                          <span>Click "Get Tracking No." below to message us on WhatsApp.</span>
+                                          <span>Click "Enquiry" below to message us on WhatsApp.</span>
                                         </p>
                                         <p className="text-[10px] text-gray-500 leading-relaxed flex items-start gap-2">
                                           <span className="bg-brand-grey/20 text-gray-500 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[8px] flex-shrink-0 mt-0.5">2</span>
@@ -398,7 +398,7 @@ export const OrderLookup: React.FC = () => {
                                            rel="noopener noreferrer"
                                            className="flex-1 bg-white border border-brand-green/30 text-brand-green px-4 py-2.5 rounded-[2px] text-[10px] font-bold uppercase tracking-widest hover:bg-brand-green hover:text-white transition-all flex items-center justify-center gap-2 shadow-sm"
                                          >
-                                           <MessageCircle size={14} /> Get Tracking No.
+                                           <MessageCircle size={14} /> Enquiry
                                          </a>
                                        )}
                                        <a 
