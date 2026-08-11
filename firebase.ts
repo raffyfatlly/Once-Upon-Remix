@@ -379,34 +379,85 @@ export const updateOrderStatusInDb = async (id: string, status: Order['status'])
 export const searchCakenicOrder = async (email?: string, phone?: string, orderId?: string): Promise<Order[]> => {
   if (!db) return [];
   try {
-    if (orderId && orderId.trim()) {
-      const order = await getOrderById(orderId.trim());
-      if (order) return [order];
-    }
-
-    const q = query(collection(db, 'orders'), orderBy('date', 'desc'), limit(150));
-    const snapshot = await getDocs(q);
-    const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
-
-    const cleanInputEmail = (email || '').toLowerCase().trim();
-    const cleanInputPhone = (phone || '').replace(/[^\d]/g, '');
+    const cleanEmail = (email || '').toLowerCase().trim();
+    const cleanPhoneDigits = (phone || '').replace(/[^\d]/g, '');
+    
+    const normalizePhone = (p: string) => {
+      let digits = p.replace(/[^\d]/g, '');
+      if (digits.startsWith('60')) digits = digits.substring(2);
+      else if (digits.startsWith('0')) digits = digits.substring(1);
+      return digits;
+    };
+    
+    const normInputPhone = normalizePhone(phone || '');
     const cleanOrderId = (orderId || '').trim();
 
+    // Direct ID lookup if orderId is provided or if input is an order ID directly
+    if (cleanOrderId) {
+      const directOrder = await getOrderById(cleanOrderId);
+      if (directOrder) return [directOrder];
+    }
+    if (cleanEmail && cleanEmail.length >= 4 && !cleanEmail.includes('@')) {
+      const directOrder = await getOrderById(cleanEmail);
+      if (directOrder) return [directOrder];
+    }
+
+    // Query orders from Firestore with fallback
+    let snapshot;
+    try {
+      const q = query(collection(db, 'orders'), orderBy('date', 'desc'), limit(300));
+      snapshot = await getDocs(q);
+    } catch (queryErr) {
+      console.warn("Ordered search failed, falling back to simple query:", queryErr);
+      const fallbackQuery = query(collection(db, 'orders'), limit(300));
+      snapshot = await getDocs(fallbackQuery);
+    }
+
+    const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+
     return allOrders.filter(order => {
+      if (!order) return false;
+
+      // Identify Cakenic order
       const isCakenic = order.source === 'cakenic' || 
         order.channel === 'Cakenic Sales' || 
+        order.channel === 'cakenic' ||
         order.utm_source === 'cakenic_landing_page' ||
-        (order.shippingAddress && order.shippingAddress.toLowerCase().trim() === 'cakenic') ||
-        order.items?.some(i => i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic')));
+        (order.shippingAddress && order.shippingAddress.toLowerCase().trim().includes('cakenic')) ||
+        order.items?.some(i => 
+          i.collection === 'Cakenic Ticket' || 
+          i.collection === 'Event' ||
+          i.category === 'Event Ticket' || 
+          Boolean(i.isCakenicOnly) || 
+          (i.id && i.id.toLowerCase().includes('cakenic')) ||
+          (i.name && i.name.toLowerCase().includes('ticket')) ||
+          (i.name && i.name.toLowerCase().includes('cakenic'))
+        );
       
       if (!isCakenic) return false;
 
       const orderEmail = (order.customerEmail || '').toLowerCase().trim();
-      const orderPhone = (order.customerPhone || '').replace(/[^\d]/g, '');
+      const orderPhoneDigits = (order.customerPhone || '').replace(/[^\d]/g, '');
+      const normOrderPhone = normalizePhone(order.customerPhone || '');
+      const orderIdStr = (order.id || '').toLowerCase().trim();
 
-      if (cleanOrderId && order.id === cleanOrderId) return true;
-      if (cleanInputEmail && orderEmail.includes(cleanInputEmail)) return true;
-      if (cleanInputPhone && cleanInputPhone.length >= 4 && (orderPhone.includes(cleanInputPhone) || cleanInputPhone.includes(orderPhone))) return true;
+      // Check Order ID match
+      if (cleanOrderId && orderIdStr === cleanOrderId.toLowerCase()) return true;
+
+      // Check Email match
+      if (cleanEmail) {
+        if (orderEmail && (orderEmail.includes(cleanEmail) || cleanEmail.includes(orderEmail))) return true;
+        if (orderIdStr === cleanEmail) return true;
+      }
+
+      // Check Phone match
+      if (cleanPhoneDigits && cleanPhoneDigits.length >= 4) {
+        if (orderPhoneDigits && (orderPhoneDigits.includes(cleanPhoneDigits) || cleanPhoneDigits.includes(orderPhoneDigits))) return true;
+        if (normInputPhone && normOrderPhone && normInputPhone.length >= 4) {
+          if (normOrderPhone.includes(normInputPhone) || normInputPhone.includes(normOrderPhone)) return true;
+        }
+        if (orderIdStr === cleanPhoneDigits) return true;
+      }
 
       return false;
     });
