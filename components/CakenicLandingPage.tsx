@@ -1006,10 +1006,11 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <div className="relative">
                   <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B5450]" />
                   <input
-                    type="email"
+                    type="text"
+                    inputMode="email"
                     value={lookupEmail}
                     onChange={(e) => setLookupEmail(e.target.value)}
-                    placeholder="sarah@example.com"
+                    placeholder="e.g. sarah@example.com"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-[#332524]/15 rounded-xl text-xs text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 transition-all shadow-sm"
                   />
                 </div>
@@ -1017,15 +1018,16 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
 
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-[#332524]/80 mb-1">
-                  Phone Number
+                  Phone Number or Order ID
                 </label>
                 <div className="relative">
                   <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B5450]" />
                   <input
-                    type="tel"
+                    type="text"
+                    inputMode="tel"
                     value={lookupPhone}
                     onChange={(e) => setLookupPhone(e.target.value)}
-                    placeholder="e.g. 0123456789"
+                    placeholder="e.g. 0133637123 or #1042"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-[#332524]/15 rounded-xl text-xs text-[#332524] placeholder-[#332524]/40 focus:outline-none focus:border-[#E3A099] focus:ring-2 focus:ring-[#E3A099]/20 transition-all shadow-sm"
                   />
                 </div>
@@ -1042,7 +1044,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
             <button
               type="submit"
               disabled={isSearchingTicket}
-              className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-[0_6px_20px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full bg-[#E3A099] hover:bg-[#d99088] text-white py-3.5 px-6 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 shadow-[0_6px_20px_rgba(227,160,153,0.35)] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {isSearchingTicket ? (
                 <>

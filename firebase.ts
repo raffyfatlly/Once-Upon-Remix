@@ -379,88 +379,262 @@ export const updateOrderStatusInDb = async (id: string, status: Order['status'])
 export const searchCakenicOrder = async (email?: string, phone?: string, orderId?: string): Promise<Order[]> => {
   if (!db) return [];
   try {
-    const cleanEmail = (email || '').toLowerCase().trim();
-    const cleanPhoneDigits = (phone || '').replace(/[^\d]/g, '');
-    
-    const normalizePhone = (p: string) => {
+    const rawEmail = (email || '').trim();
+    const rawPhone = (phone || '').trim();
+    const rawOrderId = (orderId || '').trim();
+
+    // Pool all non-empty raw inputs
+    const inputPool = [rawEmail, rawPhone, rawOrderId].filter(Boolean);
+    if (inputPool.length === 0) return [];
+
+    // Helper: Normalize phone to core digits (strip non-digits, country code +60/60, and leading 0)
+    const getCorePhoneDigits = (p: string) => {
       let digits = p.replace(/[^\d]/g, '');
-      if (digits.startsWith('60')) digits = digits.substring(2);
-      else if (digits.startsWith('0')) digits = digits.substring(1);
+      if (digits.startsWith('60') && digits.length >= 9) digits = digits.substring(2);
+      if (digits.startsWith('0') && digits.length >= 8) digits = digits.substring(1);
       return digits;
     };
-    
-    const normInputPhone = normalizePhone(phone || '');
-    const cleanOrderId = (orderId || '').trim();
 
-    // Direct ID lookup if orderId is provided or if input is an order ID directly
-    if (cleanOrderId) {
-      const directOrder = await getOrderById(cleanOrderId);
-      if (directOrder) return [directOrder];
+    const getRawPhoneDigits = (p: string) => p.replace(/[^\d]/g, '');
+
+    // Extract email candidates
+    const emailCandidates: string[] = [];
+    inputPool.forEach(term => {
+      if (term.includes('@')) {
+        emailCandidates.push(term.toLowerCase().trim());
+      }
+    });
+
+    // Extract phone/digit candidates
+    const phoneCandidates: string[] = [];
+    const corePhoneCandidates: string[] = [];
+    const orderIdCandidates: string[] = [];
+
+    inputPool.forEach(term => {
+      const cleanTerm = term.replace(/^#/, '').trim();
+      const rawDigits = getRawPhoneDigits(term);
+      const coreDigits = getCorePhoneDigits(term);
+
+      if (rawDigits.length >= 3 && rawDigits.length <= 8) {
+        orderIdCandidates.push(cleanTerm);
+        orderIdCandidates.push(rawDigits);
+      }
+      if (rawDigits.length >= 7) {
+        phoneCandidates.push(term);
+        phoneCandidates.push(rawDigits);
+        if (coreDigits) corePhoneCandidates.push(coreDigits);
+      } else if (!term.includes('@')) {
+        // Could also be an order ID
+        orderIdCandidates.push(cleanTerm);
+      }
+    });
+
+    // We collect all matching Order objects in a Map by Order ID
+    const ordersMap = new Map<string, Order>();
+
+    // 1. Direct ID lookups
+    for (const candId of orderIdCandidates) {
+      if (candId) {
+        try {
+          const directOrder = await getOrderById(candId);
+          if (directOrder) ordersMap.set(directOrder.id, directOrder);
+        } catch (_) {}
+      }
     }
-    if (cleanEmail && cleanEmail.length >= 4 && !cleanEmail.includes('@')) {
-      const directOrder = await getOrderById(cleanEmail);
-      if (directOrder) return [directOrder];
-    }
 
-    // Query orders from Firestore with fallback
-    let snapshot;
-    try {
-      const q = query(collection(db, 'orders'), orderBy('date', 'desc'), limit(300));
-      snapshot = await getDocs(q);
-    } catch (queryErr) {
-      console.warn("Ordered search failed, falling back to simple query:", queryErr);
-      const fallbackQuery = query(collection(db, 'orders'), limit(300));
-      snapshot = await getDocs(fallbackQuery);
-    }
+    // 2. Targeted Firestore queries by phone variations
+    const phoneQueryPromises: Promise<any>[] = [];
+    const phoneQueryVariants = new Set<string>();
 
-    const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+    phoneCandidates.forEach(p => {
+      const digits = getRawPhoneDigits(p);
+      const core = getCorePhoneDigits(p);
+      if (digits) {
+        phoneQueryVariants.add(digits);
+        phoneQueryVariants.add(p);
+        phoneQueryVariants.add(`+${digits}`);
+      }
+      if (core) {
+        phoneQueryVariants.add(`0${core}`);
+        phoneQueryVariants.add(`+60${core}`);
+        phoneQueryVariants.add(`60${core}`);
+        phoneQueryVariants.add(`+60 ${core.substring(0, 2)}-${core.substring(2)}`);
+        phoneQueryVariants.add(`0${core.substring(0, 2)}-${core.substring(2)}`);
+      }
+    });
 
-    return allOrders.filter(order => {
-      if (!order) return false;
-
-      // Identify Cakenic order
-      const isCakenic = order.source === 'cakenic' || 
-        order.channel === 'Cakenic Sales' || 
-        order.channel === 'cakenic' ||
-        order.utm_source === 'cakenic_landing_page' ||
-        (order.shippingAddress && order.shippingAddress.toLowerCase().trim().includes('cakenic')) ||
-        order.items?.some(i => 
-          i.collection === 'Cakenic Ticket' || 
-          i.collection === 'Event' ||
-          i.category === 'Event Ticket' || 
-          Boolean(i.isCakenicOnly) || 
-          (i.id && i.id.toLowerCase().includes('cakenic')) ||
-          (i.name && i.name.toLowerCase().includes('ticket')) ||
-          (i.name && i.name.toLowerCase().includes('cakenic'))
+    phoneQueryVariants.forEach(variant => {
+      if (variant && variant.length >= 5) {
+        phoneQueryPromises.push(
+          getDocs(query(collection(db, 'orders'), where('customerPhone', '==', variant))).catch(() => null)
         );
-      
-      if (!isCakenic) return false;
+      }
+    });
 
-      const orderEmail = (order.customerEmail || '').toLowerCase().trim();
-      const orderPhoneDigits = (order.customerPhone || '').replace(/[^\d]/g, '');
-      const normOrderPhone = normalizePhone(order.customerPhone || '');
-      const orderIdStr = (order.id || '').toLowerCase().trim();
+    // 3. Targeted Firestore queries by email
+    emailCandidates.forEach(em => {
+      phoneQueryPromises.push(
+        getDocs(query(collection(db, 'orders'), where('customerEmail', '==', em))).catch(() => null)
+      );
+    });
 
-      // Check Order ID match
-      if (cleanOrderId && orderIdStr === cleanOrderId.toLowerCase()) return true;
+    // 4. Targeted Cakenic collection queries
+    phoneQueryPromises.push(
+      getDocs(query(collection(db, 'orders'), where('source', '==', 'cakenic'))).catch(() => null)
+    );
+    phoneQueryPromises.push(
+      getDocs(query(collection(db, 'orders'), where('utm_source', '==', 'cakenic_landing_page'))).catch(() => null)
+    );
+    phoneQueryPromises.push(
+      getDocs(query(collection(db, 'orders'), where('channel', '==', 'Cakenic Sales'))).catch(() => null)
+    );
 
-      // Check Email match
-      if (cleanEmail) {
-        if (orderEmail && (orderEmail.includes(cleanEmail) || cleanEmail.includes(orderEmail))) return true;
-        if (orderIdStr === cleanEmail) return true;
+    // 5. Recent orders query (up to 500 orders)
+    phoneQueryPromises.push(
+      getDocs(query(collection(db, 'orders'), orderBy('date', 'desc'), limit(500))).catch(() => null)
+    );
+    phoneQueryPromises.push(
+      getDocs(query(collection(db, 'orders'), limit(500))).catch(() => null)
+    );
+
+    const querySnapshots = await Promise.all(phoneQueryPromises);
+
+    querySnapshots.forEach(snap => {
+      if (snap && snap.docs) {
+        snap.docs.forEach((d: any) => {
+          const data = d.data();
+          const ordId = d.id || data.id;
+          if (ordId && !ordersMap.has(ordId)) {
+            ordersMap.set(ordId, { id: ordId, ...data } as Order);
+          }
+        });
+      }
+    });
+
+    const allOrders = Array.from(ordersMap.values());
+
+    // Helper: Determine if an order is related to Cakenic or Ticket
+    const isCakenicOrTicketOrder = (order: Order) => {
+      if (!order) return false;
+      const src = (order.source || '').toLowerCase();
+      const ch = (order.channel || '').toLowerCase();
+      const utm = (order.utm_source || '').toLowerCase();
+      const addr = (order.shippingAddress || '').toLowerCase();
+      const notes = `${order.adminNotes || ''} ${(order as any).notes || ''}`.toLowerCase();
+
+      if (src.includes('cakenic') || ch.includes('cakenic') || utm.includes('cakenic') || addr.includes('cakenic') || notes.includes('cakenic')) {
+        return true;
       }
 
-      // Check Phone match
-      if (cleanPhoneDigits && cleanPhoneDigits.length >= 4) {
-        if (orderPhoneDigits && (orderPhoneDigits.includes(cleanPhoneDigits) || cleanPhoneDigits.includes(orderPhoneDigits))) return true;
-        if (normInputPhone && normOrderPhone && normInputPhone.length >= 4) {
-          if (normOrderPhone.includes(normInputPhone) || normInputPhone.includes(normOrderPhone)) return true;
+      if (addr.includes('putrajaya') || addr.includes('johor') || addr.includes('botani') || addr.includes('ticket') || addr.includes('picnic')) {
+        return true;
+      }
+
+      if (order.items && Array.isArray(order.items)) {
+        return order.items.some(item => {
+          if (!item) return false;
+          const col = (item.collection || '').toLowerCase();
+          const cat = (item.category || '').toLowerCase();
+          const itemName = (item.name || '').toLowerCase();
+          const itemId = (item.id || '').toLowerCase();
+
+          return (
+            col.includes('cakenic') ||
+            col.includes('ticket') ||
+            col.includes('event') ||
+            cat.includes('ticket') ||
+            cat.includes('event') ||
+            Boolean(item.isCakenicOnly) ||
+            itemId.includes('cakenic') ||
+            itemId.includes('ticket') ||
+            itemId.includes('putrajaya') ||
+            itemId.includes('johor') ||
+            itemName.includes('cakenic') ||
+            itemName.includes('ticket') ||
+            itemName.includes('event') ||
+            itemName.includes('picnic') ||
+            itemName.includes('putrajaya') ||
+            itemName.includes('johor') ||
+            itemName.includes('botani') ||
+            itemName.includes('eco spring') ||
+            itemName.includes('pass') ||
+            itemName.includes('slot') ||
+            itemName.includes('session') ||
+            itemName.includes('admission')
+          );
+        });
+      }
+
+      return false;
+    };
+
+    // Filter matching orders against inputs
+    const matchedOrders = allOrders.filter(order => {
+      if (!order) return false;
+
+      const orderEmail = (order.customerEmail || '').toLowerCase().trim();
+      const orderPhoneRaw = (order.customerPhone || '').trim();
+      const orderPhoneDigits = getRawPhoneDigits(orderPhoneRaw);
+      const orderCorePhone = getCorePhoneDigits(orderPhoneRaw);
+      const orderIdStr = (order.id || '').toLowerCase().trim();
+      const orderCleanId = orderIdStr.replace(/^#/, '');
+      const orderCustomerName = (order.customerName || '').toLowerCase().trim();
+
+      // 1. Order ID Match
+      for (const cand of orderIdCandidates) {
+        const cleanCand = cand.toLowerCase().replace(/^#/, '').trim();
+        if (cleanCand && (orderCleanId === cleanCand || orderIdStr === cleanCand)) {
+          return true;
         }
-        if (orderIdStr === cleanPhoneDigits) return true;
+      }
+
+      // 2. Email Match
+      for (const candEmail of emailCandidates) {
+        if (candEmail && orderEmail && (orderEmail === candEmail || orderEmail.includes(candEmail) || candEmail.includes(orderEmail))) {
+          return true;
+        }
+      }
+
+      // 3. Phone Match
+      for (const candPhone of phoneCandidates) {
+        const candDigits = getRawPhoneDigits(candPhone);
+        const candCore = getCorePhoneDigits(candPhone);
+
+        if (candDigits && candDigits.length >= 5) {
+          if (orderPhoneDigits === candDigits || orderPhoneDigits.includes(candDigits) || candDigits.includes(orderPhoneDigits)) {
+            return true;
+          }
+        }
+
+        if (candCore && candCore.length >= 5 && orderCorePhone && orderCorePhone.length >= 5) {
+          if (orderCorePhone === candCore || orderCorePhone.includes(candCore) || candCore.includes(orderCorePhone)) {
+            return true;
+          }
+        }
+      }
+
+      // 4. Fallback search across all input terms
+      for (const term of inputPool) {
+        const cleanTerm = term.toLowerCase().replace(/^#/, '').trim();
+        if (cleanTerm.length >= 3) {
+          if (orderIdStr.includes(cleanTerm) || orderCleanId.includes(cleanTerm)) return true;
+          if (orderEmail && orderEmail.includes(cleanTerm)) return true;
+          if (orderCustomerName && orderCustomerName.includes(cleanTerm)) return true;
+        }
       }
 
       return false;
     });
+
+    // Prioritize Cakenic/Ticket orders
+    const cakenicOrders = matchedOrders.filter(isCakenicOrTicketOrder);
+
+    // If we found specific Cakenic/Ticket orders, return them; otherwise if direct matched, return matched
+    if (cakenicOrders.length > 0) {
+      return cakenicOrders;
+    }
+
+    return matchedOrders;
   } catch (e) {
     console.error("Ticket search error:", e);
     return [];
