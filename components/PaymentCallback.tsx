@@ -39,6 +39,13 @@ export const PaymentCallback: React.FC = () => {
           return;
         }
 
+        // If order was ALREADY marked as paid (by CHIP server webhook or previous session)
+        if (fetchedOrder && (fetchedOrder.status === 'paid' || fetchedOrder.status === 'packed' || fetchedOrder.status === 'shipped' || fetchedOrder.status === 'delivered')) {
+          setStatus('success');
+          setOrder(fetchedOrder);
+          return;
+        }
+
         if (result === 'success') {
           // Payment Successful: Stock was already deducted at checkout.
           // Just update status to Paid.
@@ -56,20 +63,56 @@ export const PaymentCallback: React.FC = () => {
           } catch (trackingErr) {
             console.warn("Purchase tracking failed (silent):", trackingErr);
           }
-        } else if (result === 'failed') {
-          // Payment Failed: Restore the stock quantity.
-          await restoreStockForOrder(orderId, 'failed');
-          setStatus('failed');
-          if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'failed' });
-        } else if (result === 'cancelled') {
-          // Payment Cancelled: Restore the stock quantity.
-          await restoreStockForOrder(orderId, 'cancelled');
-          setStatus('cancelled');
-          if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'cancelled' });
-        } else {
-          // Unknown State: Default to failed/restore safety
-          await restoreStockForOrder(orderId, 'failed');
-          setStatus('failed');
+          return;
+        }
+
+        // 🛡️ CRITICAL RESCUE CHECK:
+        // Even if result query says "cancelled" or "failed" or is empty (e.g. user pressed Back after paying,
+        // or browser popup issue), verify directly with CHIP Gateway API before taking any destructive action!
+        let isConfirmedPaidOnGateway = false;
+        try {
+          const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
+          if (verifyResp.ok) {
+            const verifyData = await verifyResp.json();
+            if (verifyData && verifyData.paid === true) {
+              isConfirmedPaidOnGateway = true;
+              console.log(`[PaymentCallback] CHIP Gateway confirmed Order #${orderId} is PAID! Rescuing order.`);
+              setStatus('success');
+              if (fetchedOrder) {
+                setOrder({ ...fetchedOrder, status: 'paid' });
+                try {
+                  trackPurchase(orderId, fetchedOrder.total);
+                } catch (_) {}
+              }
+              return;
+            }
+          }
+        } catch (verifyErr) {
+          console.warn("[PaymentCallback] Live verify fetch failed:", verifyErr);
+        }
+
+        // If gateway explicitly confirmed NOT paid, and order is still not paid:
+        if (!isConfirmedPaidOnGateway) {
+          // Re-check order status from DB once more to ensure webhook didn't set it to paid in the background
+          const doubleCheckOrder = await getOrderById(orderId);
+          if (doubleCheckOrder && (doubleCheckOrder.status === 'paid' || doubleCheckOrder.status === 'packed' || doubleCheckOrder.status === 'shipped')) {
+            setStatus('success');
+            setOrder(doubleCheckOrder);
+            return;
+          }
+
+          if (result === 'failed') {
+            await restoreStockForOrder(orderId, 'failed');
+            setStatus('failed');
+            if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'failed' });
+          } else if (result === 'cancelled') {
+            await restoreStockForOrder(orderId, 'cancelled');
+            setStatus('cancelled');
+            if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'cancelled' });
+          } else {
+            await restoreStockForOrder(orderId, 'failed');
+            setStatus('failed');
+          }
         }
       } catch (error) {
         console.error("Failed to update order status:", error);

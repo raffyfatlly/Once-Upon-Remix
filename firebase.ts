@@ -217,6 +217,12 @@ export const restoreStockForOrder = async (orderId: string, newStatus: 'cancelle
       return; 
     }
 
+    // 🛡️ CRITICAL IMMUNITY: Never cancel or restock an order that is already paid or fulfilled!
+    if (['paid', 'packed', 'shipped', 'delivered'].includes(orderData.status)) {
+      console.warn(`Order ${orderId} is already "${orderData.status}". REFUSING to cancel or restore stock.`);
+      return;
+    }
+
     // 2. Read all Product Docs involved
     const productReads = orderData.items.map(item => {
       let docId = item.baseProductId || item.id;
@@ -290,12 +296,31 @@ export const autoReleaseStaleOrders = async (timeoutMinutes: number = 60): Promi
     const diffMinutes = (now - orderTime) / (1000 * 60);
 
     if (diffMinutes > timeoutMinutes) {
-      console.log(`Order ${order.id} is stale (${Math.round(diffMinutes)} mins). Releasing stock...`);
+      // 🛡️ CRITICAL CHECK: Before cancelling, check CHIP Gateway API to ensure it wasn't paid!
+      let isActuallyPaid = false;
       try {
-        await restoreStockForOrder(order.id, 'cancelled');
-        releaseCount++;
-      } catch (err) {
-        console.error(`Failed to auto-release order ${order.id}:`, err);
+        if (typeof window !== 'undefined' || typeof fetch !== 'undefined') {
+          const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(order.id)}`);
+          if (verifyResp.ok) {
+            const verifyData = await verifyResp.json();
+            if (verifyData && verifyData.paid === true) {
+              isActuallyPaid = true;
+              console.log(`[AutoRelease] Order #${order.id} was confirmed PAID on CHIP! Protected from cancellation.`);
+            }
+          }
+        }
+      } catch (verifyErr) {
+        console.warn(`[AutoRelease] Could not verify order #${order.id} against CHIP:`, verifyErr);
+      }
+
+      if (!isActuallyPaid) {
+        console.log(`Order ${order.id} is stale (${Math.round(diffMinutes)} mins) and unconfirmed. Releasing stock...`);
+        try {
+          await restoreStockForOrder(order.id, 'cancelled');
+          releaseCount++;
+        } catch (err) {
+          console.error(`Failed to auto-release order ${order.id}:`, err);
+        }
       }
     }
   });
@@ -628,13 +653,29 @@ export const searchCakenicOrder = async (email?: string, phone?: string, orderId
 
     // Prioritize Cakenic/Ticket orders
     const cakenicOrders = matchedOrders.filter(isCakenicOrTicketOrder);
+    const finalOrders = cakenicOrders.length > 0 ? cakenicOrders : matchedOrders;
 
-    // If we found specific Cakenic/Ticket orders, return them; otherwise if direct matched, return matched
-    if (cakenicOrders.length > 0) {
-      return cakenicOrders;
-    }
+    // 🛡️ AUTO-RESCUE: If any retrieved order is pending or cancelled, verify against CHIP in parallel
+    const rescuedOrders = await Promise.all(
+      finalOrders.map(async (order) => {
+        if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
+          try {
+            if (typeof window !== 'undefined' || typeof fetch !== 'undefined') {
+              const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(order.id)}`);
+              if (verifyResp.ok) {
+                const verifyData = await verifyResp.json();
+                if (verifyData && verifyData.paid === true) {
+                  return { ...order, status: 'paid' as Order['status'] };
+                }
+              }
+            }
+          } catch (_) {}
+        }
+        return order;
+      })
+    );
 
-    return matchedOrders;
+    return rescuedOrders;
   } catch (e) {
     console.error("Ticket search error:", e);
     return [];

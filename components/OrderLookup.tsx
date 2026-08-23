@@ -112,9 +112,21 @@ export const OrderLookup: React.FC = () => {
           return;
         }
         
-        const order = await getOrderById(orderId.trim());
+        let order = await getOrderById(orderId.trim());
         
         if (order && order.customerEmail.toLowerCase() === email.toLowerCase()) {
+           // If order is pending or cancelled, verify against CHIP to ensure status is up to date
+           if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
+             try {
+               const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(order.id)}`);
+               if (verifyResp.ok) {
+                 const verifyData = await verifyResp.json();
+                 if (verifyData && verifyData.paid === true) {
+                   order = { ...order, status: 'paid' };
+                 }
+               }
+             } catch (_) {}
+           }
            setOrders([order]);
            setHasSearched(true);
         } else {
