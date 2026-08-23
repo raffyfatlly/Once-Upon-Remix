@@ -129,53 +129,86 @@ export const PaymentCallback: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchParams]);
 
-  // Check if order is Cakenic
-  const isCakenicOrder = order && (
+  // Determine if this is a Cakenic order or Once Upon store order
+  const shopParam = searchParams.get('shop');
+  const isCakenicParam = searchParams.get('cakenic') === 'true';
+
+  const isCakenicOrder = shopParam === 'cakenic' || isCakenicParam || Boolean(order && (
     order.source === 'cakenic' || 
     order.channel === 'Cakenic Sales' || 
     order.utm_source === 'cakenic_landing_page' || 
     (order.shippingAddress && order.shippingAddress.toLowerCase().trim() === 'cakenic') ||
     order.items?.some(i => i.collection === 'Cakenic Ticket' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && i.id.startsWith('cakenic')))
-  );
+  ));
 
   return (
-    <div className="min-h-screen bg-[#F1E8E2] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+    <div className={`min-h-screen ${isCakenicOrder ? 'bg-[#F1E8E2]' : 'bg-[#FAF8F5]'} flex items-center justify-center p-4 sm:p-6 animate-fade-in`}>
       <div className="max-w-xl w-full text-center">
         
+        {/* --- LOADING STATES --- */}
         {status === 'loading' && (
-          <div className="flex flex-col items-center bg-[#FBF6F1] p-10 rounded-[32px] border border-[#332524]/10 shadow-lg">
-             <Loader2 size={48} className="text-[#E3A099] animate-spin mb-6" />
-             <h2 className="font-serif text-2xl sm:text-3xl text-[#332524]">Processing Ticket Status...</h2>
-             <p className="text-[#6B5450] text-xs mt-2 font-medium">Updating your Cakenic order details</p>
-          </div>
+          isCakenicOrder ? (
+            <div className="flex flex-col items-center bg-[#FBF6F1] p-10 rounded-[32px] border border-[#332524]/10 shadow-lg max-w-md mx-auto animate-pulse">
+              <Loader2 size={44} className="text-[#E3A099] animate-spin mb-5" />
+              <h2 className="font-serif text-2xl sm:text-3xl text-[#332524]">Processing Ticket Status...</h2>
+              <p className="text-[#6B5450] text-xs mt-2 font-medium">Updating your Cakenic event details</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center bg-white p-10 rounded-[32px] border border-gray-100 shadow-lg max-w-md mx-auto">
+              <Loader2 size={44} className="text-brand-flamingo animate-spin mb-5" />
+              <h2 className="font-serif text-2xl sm:text-3xl text-gray-900">Confirming Your Order...</h2>
+              <p className="text-gray-500 text-xs mt-2 font-medium">Updating your payment and order details</p>
+            </div>
+          )
         )}
 
-        {status !== 'loading' && isCakenicOrder && order && (
-          <CakenicTicketView 
-            order={order} 
-            isCancel={status === 'cancelled' || status === 'failed'} 
-          />
+        {/* --- CAKENIC EVENT SPECIFIC VIEW --- */}
+        {status !== 'loading' && isCakenicOrder && (
+          order ? (
+            <CakenicTicketView 
+              order={order} 
+              isCancel={status === 'cancelled' || status === 'failed'} 
+              onClose={() => navigate('/cakenic')}
+            />
+          ) : (
+            <div className="bg-[#FBF6F1] p-8 sm:p-10 rounded-[32px] shadow-lg border border-[#332524]/10 max-w-md mx-auto text-[#332524]">
+              <div className="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto text-rose-600 mb-4">
+                <AlertCircle size={32} />
+              </div>
+              <h2 className="font-serif text-2xl font-semibold mb-2">Cakenic Reservation Update</h2>
+              <p className="text-xs text-[#6B5450] mb-6">
+                {status === 'cancelled' ? 'Your ticket reservation was cancelled.' : 'Payment could not be confirmed.'}
+              </p>
+              <button 
+                onClick={() => navigate('/cakenic')}
+                className="bg-[#E3A099] text-white px-8 py-3 rounded-full text-xs font-bold uppercase tracking-wider hover:bg-[#d88f87] transition-colors"
+              >
+                Return to Cakenic
+              </button>
+            </div>
+          )
         )}
 
-        {status !== 'loading' && (!isCakenicOrder || !order) && (
-          <div className="bg-white p-8 sm:p-10 rounded-[32px] shadow-lg border border-gray-100 max-w-md mx-auto">
+        {/* --- ONCE UPON MAIN STORE VIEW (BLANKETS / SWADDLES / GIFTS) --- */}
+        {status !== 'loading' && !isCakenicOrder && (
+          <div className="bg-white p-8 sm:p-10 rounded-[32px] shadow-xl border border-brand-latte/10 max-w-md mx-auto">
             {status === 'success' && (
               <div className="flex flex-col items-center animate-slide-up">
-                <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6">
+                <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 shadow-inner">
                   <CheckCircle size={40} className="text-brand-green" />
                 </div>
                 <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-2">Payment Successful</h1>
                 {displayOrderId && (
-                  <div className="mb-4 bg-brand-grey/10 px-4 py-1 rounded-full text-xs font-mono text-gray-500">
+                  <div className="mb-4 bg-brand-grey/10 px-4 py-1.5 rounded-full text-xs font-mono text-gray-600 font-semibold">
                     Order #{displayOrderId}
                   </div>
                 )}
-                <p className="font-sans text-gray-500 mb-8 leading-relaxed">
-                  Thank you for your purchase. Your order has been confirmed. A receipt has been sent to your email.
+                <p className="font-sans text-gray-500 mb-8 text-sm leading-relaxed">
+                  Thank you for your purchase from Once Upon. Your order has been confirmed and a receipt has been sent to your email.
                 </p>
                 <button 
                   onClick={() => navigate('/')}
-                  className="bg-brand-flamingo text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-gold transition-colors rounded-full flex items-center gap-2"
+                  className="bg-brand-flamingo text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-gold transition-colors rounded-full flex items-center gap-2 shadow-md hover:shadow-lg"
                 >
                   Continue Shopping <ArrowRight size={14} />
                 </button>
@@ -187,14 +220,14 @@ export const PaymentCallback: React.FC = () => {
                 <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
                   <XCircle size={40} className="text-red-400" />
                 </div>
-                <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-4">Payment Failed</h1>
-                <p className="font-sans text-gray-500 mb-8 leading-relaxed">
-                  We couldn't process your payment. The items have been returned to stock.
+                <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-3">Payment Failed</h1>
+                <p className="font-sans text-gray-500 mb-8 text-sm leading-relaxed">
+                  We couldn't process your payment. Any items reserved for you have been returned to stock.
                 </p>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
                   <button 
                     onClick={() => navigate('/checkout')}
-                    className="bg-gray-900 text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-flamingo transition-colors rounded-full"
+                    className="bg-gray-900 text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-flamingo transition-colors rounded-full shadow-sm"
                   >
                     Try Again
                   </button>
@@ -263,19 +296,25 @@ export const PaymentCallback: React.FC = () => {
 
             {status === 'cancelled' && (
               <div className="flex flex-col items-center animate-slide-up">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6">
-                  <AlertCircle size={40} className="text-gray-400" />
+                <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle size={40} className="text-amber-500" />
                 </div>
-                <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-4">Payment Cancelled</h1>
-                <p className="font-sans text-gray-500 mb-8 leading-relaxed">
-                  You cancelled the payment. The stock reserved for you has been released.
+                <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-3">Payment Cancelled</h1>
+                <p className="font-sans text-gray-500 mb-8 text-sm leading-relaxed">
+                  You cancelled the payment process. Any items reserved for your order have been returned to stock.
                 </p>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
                   <button 
                     onClick={() => navigate('/checkout')}
-                    className="bg-brand-gold text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-flamingo transition-colors rounded-full"
+                    className="bg-brand-flamingo text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-gold transition-colors rounded-full shadow-sm"
                   >
                     Return to Checkout
+                  </button>
+                  <button 
+                    onClick={() => navigate('/')}
+                    className="text-gray-500 px-6 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:text-gray-900 transition-colors"
+                  >
+                    Return to Store
                   </button>
                 </div>
               </div>

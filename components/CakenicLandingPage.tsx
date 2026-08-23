@@ -266,9 +266,9 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
         },
         reference: orderRef.id,
         force_redirect: true,
-        success_redirect: `${window.location.origin}/#/payment/callback?result=success&order=${orderRef.id}`,
-        failure_redirect: `${window.location.origin}/#/payment/callback?result=failed&order=${orderRef.id}`,
-        cancel_redirect: `${window.location.origin}/#/payment/callback?result=cancelled&order=${orderRef.id}`,
+        success_redirect: `${window.location.origin}/#/payment/callback?result=success&order=${orderRef.id}&shop=cakenic`,
+        failure_redirect: `${window.location.origin}/#/payment/callback?result=failed&order=${orderRef.id}&shop=cakenic`,
+        cancel_redirect: `${window.location.origin}/#/payment/callback?result=cancelled&order=${orderRef.id}&shop=cakenic`,
       };
 
       if (brandId && brandId !== 'CHIP_BRAND_ID') {

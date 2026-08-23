@@ -269,10 +269,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
         },
         reference: orderRef.id,
         force_redirect: true,
-        // Remove /# from the redirect URLs to support BrowserRouter
-        success_redirect: `${window.location.origin}/#/payment/callback?result=success&order=${orderRef.id}`,
-        failure_redirect: `${window.location.origin}/#/payment/callback?result=failed&order=${orderRef.id}`,
-        cancel_redirect: `${window.location.origin}/#/payment/callback?result=cancelled&order=${orderRef.id}`,
+        // Redirect URLs with shop identifier for Once Upon
+        success_redirect: `${window.location.origin}/#/payment/callback?result=success&order=${orderRef.id}&shop=onceupon`,
+        failure_redirect: `${window.location.origin}/#/payment/callback?result=failed&order=${orderRef.id}&shop=onceupon`,
+        cancel_redirect: `${window.location.origin}/#/payment/callback?result=cancelled&order=${orderRef.id}&shop=onceupon`,
       };
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
