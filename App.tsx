@@ -102,6 +102,31 @@ const StoreFront: React.FC<{
     return acc;
   }, {} as Record<string, Product[]>);
 
+  // Category card preview images (Jubilee Carousel for Blanket, Whimsy Fair for Swaddle)
+  const blanketCardImage = 
+    products.find(p => {
+      const name = (p.name || '').toLowerCase();
+      const isBlanket = getProductGroup(p) === 'Blankets';
+      return isBlanket && (name.includes('carousel') || name.includes('jubilee'));
+    })?.image || 
+    products.find(p => {
+      const name = (p.name || '').toLowerCase();
+      return name.includes('carousel') || name.includes('jubilee');
+    })?.image || 
+    groupedProducts['Blankets']?.[0]?.image;
+
+  const swaddleCardImage = 
+    products.find(p => {
+      const name = (p.name || '').toLowerCase();
+      const isSwaddle = getProductGroup(p) === 'Swaddle';
+      return isSwaddle && (name.includes('whimsy') || name.includes('fair'));
+    })?.image || 
+    products.find(p => {
+      const name = (p.name || '').toLowerCase();
+      return name.includes('whimsy') || name.includes('fair');
+    })?.image || 
+    groupedProducts['Swaddle']?.[0]?.image;
+
   // Review Carousel State
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 
@@ -200,9 +225,9 @@ const StoreFront: React.FC<{
                   <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-pink/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
                   <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
                   
-                  {groupedProducts['Blankets']?.[0]?.image && (
+                  {blanketCardImage && (
                     <div className="absolute right-2 bottom-4 w-28 h-28 sm:right-4 sm:bottom-4 sm:w-32 sm:h-32 md:w-38 md:h-38 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
-                      <img src={groupedProducts['Blankets'][0].image} alt="Blankets Collection" className="w-full h-full object-cover" />
+                      <img src={blanketCardImage} alt="Jubilee Carousel Blanket" className="w-full h-full object-cover" />
                     </div>
                   )}
 
@@ -232,9 +257,9 @@ const StoreFront: React.FC<{
                   <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-gold/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
                   <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
 
-                  {groupedProducts['Swaddle']?.[0]?.image && (
+                  {swaddleCardImage && (
                     <div className="absolute right-2 bottom-4 w-28 h-28 sm:right-4 sm:bottom-4 sm:w-32 sm:h-32 md:w-38 md:h-38 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
-                      <img src={groupedProducts['Swaddle'][0].image} alt="Swaddle Collection" className="w-full h-full object-cover" />
+                      <img src={swaddleCardImage} alt="Whimsy Fair Swaddle" className="w-full h-full object-cover" />
                     </div>
                   )}
 
