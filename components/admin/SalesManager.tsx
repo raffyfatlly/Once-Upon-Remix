@@ -479,6 +479,65 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
   const [lastCleanup, setLastCleanup] = useState<Date>(new Date());
   const [cleanupMessage, setCleanupMessage] = useState<string>('');
 
+  // CHIP Sync & Verification states
+  const [isSyncingChip, setIsSyncingChip] = useState<boolean>(false);
+  const [chipSyncResult, setChipSyncResult] = useState<string | null>(null);
+  const [verifyingOrderId, setVerifyingOrderId] = useState<string | null>(null);
+  const [showWebhookModal, setShowWebhookModal] = useState<boolean>(false);
+  const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+
+  const webhookUrl = typeof window !== 'undefined' 
+    ? `${window.location.origin}/api/chip/webhook` 
+    : 'https://onceuponmy.com/api/chip/webhook';
+
+  const handleCopyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 3000);
+  };
+
+  const handleSyncPendingWithChip = async () => {
+    setIsSyncingChip(true);
+    setChipSyncResult(null);
+    try {
+      const resp = await fetch('/api/chip/sync-pending');
+      const data = await resp.json();
+      if (resp.ok) {
+        if (data.rescued > 0) {
+          setChipSyncResult(`✅ Rescued ${data.rescued} order(s) to PAID!`);
+        } else {
+          setChipSyncResult(`Checked ${data.synced || 0} pending order(s). All up to date.`);
+        }
+      } else {
+        setChipSyncResult(`Sync note: ${data.error || 'Check server connection'}`);
+      }
+    } catch (err: any) {
+      setChipSyncResult('Failed to sync with CHIP: ' + err.message);
+    } finally {
+      setIsSyncingChip(false);
+      setTimeout(() => setChipSyncResult(null), 6000);
+    }
+  };
+
+  const handleVerifySingleOrderWithChip = async (orderId: string) => {
+    setVerifyingOrderId(orderId);
+    try {
+      const resp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
+      const data = await resp.json();
+      if (resp.ok && data.paid) {
+        alert(`Order #${orderId} is confirmed PAID on CHIP! Status has been updated.`);
+      } else if (resp.ok && !data.paid) {
+        alert(`Order #${orderId} is currently NOT marked as paid on CHIP (CHIP status: ${data.chip_status || 'unpaid'}).`);
+      } else {
+        alert(`Verification response: ${data.error || data.note || 'Could not verify'}`);
+      }
+    } catch (err: any) {
+      alert(`Verification failed: ${err.message}`);
+    } finally {
+      setVerifyingOrderId(null);
+    }
+  };
+
   const ORDER_STATUSES = ['pending', 'paid', 'packed', 'shipped', 'delivered', 'failed', 'cancelled'];
 
   // Extract unique product options with name and collection normalized
@@ -504,27 +563,33 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     });
   }, [orders, products]);
 
-  // --- AUTOMATED STALE ORDER CLEANUP ---
+  // --- AUTOMATED STALE ORDER CLEANUP & CHIP AUTO-SYNC ---
   // Runs on mount and every 60 seconds
   useEffect(() => {
-    const runCleanup = async () => {
+    const runCleanupAndSync = async () => {
       try {
-        const releasedCount = await autoReleaseStaleOrders(60); // 60 minutes timeout
+        // 1. First sync any pending orders with CHIP gateway to ensure no paid orders get mistakenly cancelled
+        try {
+          await fetch('/api/chip/sync-pending');
+        } catch (_) {}
+
+        // 2. Release truly unpaid stale orders older than 60 minutes
+        const releasedCount = await autoReleaseStaleOrders(60);
         setLastCleanup(new Date());
         if (releasedCount > 0) {
-            setCleanupMessage(`Released stock for ${releasedCount} stale order(s).`);
-            setTimeout(() => setCleanupMessage(''), 5000);
+          setCleanupMessage(`Released stock for ${releasedCount} stale order(s).`);
+          setTimeout(() => setCleanupMessage(''), 5000);
         }
       } catch (e) {
-        console.error("Auto-cleanup failed", e);
+        console.error("Auto-cleanup/sync failed", e);
       }
     };
 
     // Run immediately
-    runCleanup();
+    runCleanupAndSync();
 
     // Run interval
-    const interval = setInterval(runCleanup, 60 * 1000);
+    const interval = setInterval(runCleanupAndSync, 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1458,14 +1523,35 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-brand-latte/10 pb-6">
         <div>
             <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Sales & Customers</h2>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <p className="text-xs text-gray-400 uppercase tracking-widest">Manage orders and check status</p>
                 <div className="h-1 w-1 bg-gray-300 rounded-full"></div>
                 <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded border border-green-100 animate-pulse">
-                    <RefreshCw size={10} className="animate-spin-slow" /> Auto-Monitor Active
+                    <RefreshCw size={10} className="animate-spin-slow" /> Auto-Sync Active
                 </div>
+                <button 
+                  onClick={handleSyncPendingWithChip} 
+                  disabled={isSyncingChip}
+                  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider bg-brand-latte/10 hover:bg-brand-flamingo hover:text-white text-gray-700 px-2.5 py-1 rounded-[2px] transition-colors border border-brand-latte/20 disabled:opacity-50"
+                  title="Check CHIP Gateway for all pending orders and update paid ones immediately"
+                >
+                  {isSyncingChip ? <Loader2 size={11} className="animate-spin text-brand-flamingo" /> : <CreditCard size={11} />}
+                  {isSyncingChip ? 'Checking CHIP...' : 'Sync CHIP Orders'}
+                </button>
+                <button
+                  onClick={() => setShowWebhookModal(true)}
+                  className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-[2px] border border-blue-200 transition-colors"
+                  title="View Webhook URL for CHIP Portal setup"
+                >
+                  <Globe size={11} /> Webhook Info
+                </button>
             </div>
             {cleanupMessage && <p className="text-[10px] text-brand-flamingo font-bold mt-1 animate-fade-in">{cleanupMessage}</p>}
+            {chipSyncResult && (
+              <p className="text-[11px] text-green-700 bg-green-50 px-2 py-1 rounded border border-green-200 font-bold mt-1.5 inline-block animate-fade-in">
+                {chipSyncResult}
+              </p>
+            )}
         </div>
         
         {/* SubTab Toggle */}
@@ -1492,6 +1578,72 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
           </button>
         </div>
         </div>
+
+        {/* CHIP WEBHOOK SETUP GUIDE MODAL */}
+        {showWebhookModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowWebhookModal(false)}>
+            <div className="bg-white max-w-lg w-full p-6 md:p-8 rounded-[2px] shadow-2xl border border-brand-latte/20 relative" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-brand-flamingo/10 text-brand-flamingo rounded-[2px]">
+                    <CreditCard size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-gray-900">CHIP Webhook Configuration</h3>
+                    <p className="text-xs text-gray-500">Ensure instant, real-time status updates from CHIP</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowWebhookModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs text-gray-700 leading-relaxed">
+                <div>
+                  <label className="font-bold uppercase tracking-wider text-[10px] text-gray-500 block mb-1">
+                    Your Server Webhook URL
+                  </label>
+                  <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200 font-mono text-xs text-gray-800 break-all select-all">
+                    <span className="flex-1">{webhookUrl}</span>
+                    <button 
+                      onClick={handleCopyWebhookUrl}
+                      className="bg-brand-flamingo hover:bg-brand-flamingo/90 text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center gap-1 shrink-0 transition-colors"
+                    >
+                      {copiedWebhook ? <Check size={12} /> : <ClipboardCopy size={12} />}
+                      {copiedWebhook ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded text-amber-900 space-y-2">
+                  <div className="font-bold uppercase tracking-wider text-[10px] text-amber-800 flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-amber-600" />
+                    How to enable in CHIP Dashboard:
+                  </div>
+                  <ol className="list-decimal list-inside space-y-1 text-xs">
+                    <li>Log in to <a href="https://gate.chip-in.asia" target="_blank" rel="noreferrer" className="underline font-bold text-brand-flamingo">gate.chip-in.asia</a></li>
+                    <li>Go to <strong>Developers</strong> &rarr; <strong>Webhooks</strong></li>
+                    <li>Click <strong>Add Webhook</strong> and paste the URL above</li>
+                    <li>Subscribe to <strong>purchase.paid</strong> (or all events) & click <strong>Save</strong></li>
+                  </ol>
+                </div>
+
+                <p className="text-gray-500 text-[11px]">
+                  💡 <strong>Automatic Backup:</strong> Even if a webhook is delayed by network lag, Once Upon automatically queries CHIP when you click <strong>"Sync CHIP Orders"</strong> or when the customer returns from payment.
+                </p>
+
+                <div className="pt-2 flex justify-end">
+                  <button 
+                    onClick={() => setShowWebhookModal(false)}
+                    className="bg-brand-grey/20 hover:bg-brand-grey/30 text-gray-800 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-[2px]"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-4 mb-6">
           {/* Date Range Selector - Only for Orders tab */}
@@ -1832,7 +1984,27 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                             <div className="text-[9px] text-gray-400 font-bold uppercase mt-1 tracking-widest">{order.paymentMethod.replace('_', ' ')}</div>
                           )}
                         </td>
-                        <td className="p-4" onClick={(e) => e.stopPropagation()}><div className="relative inline-block"><select value={order.status} onChange={(e) => handleStatusUpdate(order.id, e.target.value, order.status)} className={`appearance-none pl-3 pr-8 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-flamingo ${ order.status === 'delivered' ? 'bg-green-50 border-green-200 text-green-700' : order.status === 'shipped' ? 'bg-sky-50 border-sky-200 text-sky-700' : order.status === 'packed' ? 'bg-purple-50 border-purple-200 text-purple-700' : order.status === 'paid' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : order.status === 'failed' ? 'bg-red-50 border-red-200 text-red-700' : order.status === 'cancelled' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-yellow-50 border-yellow-200 text-yellow-700' }`}>{ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}</select><div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><svg width="8" height="6" viewBox="0 0 8 6" fill="currentColor" className="text-current"><path d="M4 6L0 0H8L4 6Z" /></svg></div></div></td>
+                        <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="relative inline-block">
+                              <select value={order.status} onChange={(e) => handleStatusUpdate(order.id, e.target.value, order.status)} className={`appearance-none pl-3 pr-8 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-brand-flamingo ${ order.status === 'delivered' ? 'bg-green-50 border-green-200 text-green-700' : order.status === 'shipped' ? 'bg-sky-50 border-sky-200 text-sky-700' : order.status === 'packed' ? 'bg-purple-50 border-purple-200 text-purple-700' : order.status === 'paid' ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : order.status === 'failed' ? 'bg-red-50 border-red-200 text-red-700' : order.status === 'cancelled' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-yellow-50 border-yellow-200 text-yellow-700' }`}>
+                                {ORDER_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                              <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50"><svg width="8" height="6" viewBox="0 0 8 6" fill="currentColor" className="text-current"><path d="M4 6L0 0H8L4 6Z" /></svg></div>
+                            </div>
+                            {order.status === 'pending' && (
+                              <button
+                                onClick={() => handleVerifySingleOrderWithChip(order.id)}
+                                disabled={verifyingOrderId === order.id}
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-full transition-colors flex items-center gap-1"
+                                title="Check CHIP Gateway directly for this order"
+                              >
+                                {verifyingOrderId === order.id ? <Loader2 size={10} className="animate-spin" /> : <CreditCard size={10} />}
+                                {verifyingOrderId === order.id ? 'Checking...' : 'Check CHIP'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="p-4 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
                             <button onClick={() => handleDownloadReceipt(order)} className="text-gray-400 hover:text-brand-flamingo p-1.5 hover:bg-brand-flamingo/5 rounded transition-colors" title="Download Receipt"><Receipt size={16} /></button>
@@ -2080,13 +2252,28 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                     {/* Status Change (Duplicate of row action but handy in detail view) */}
                                     <div>
                                     <h4 className="font-serif text-sm font-bold uppercase tracking-widest text-gray-900 mb-2">Update Status</h4>
-                                    <div className="bg-white border border-brand-latte/20 p-4 rounded-[2px]">
+                                    <div className="bg-white border border-brand-latte/20 p-4 rounded-[2px] space-y-3">
                                         {/* Status Info for Admin */}
                                         {order.status === 'pending' && isStalePending(order) && (
-                                            <div className="mb-3 text-[10px] text-red-500 bg-red-50 p-2 rounded border border-red-100 flex gap-2">
+                                            <div className="text-[10px] text-red-500 bg-red-50 p-2 rounded border border-red-100 flex gap-2">
                                                 <AlertTriangle size={14} className="flex-shrink-0" />
-                                                This order has been pending for more than 60 minutes. The stock is still reserved. Change to 'Cancelled' to release stock.
+                                                This order has been pending for more than 60 minutes. The stock is still reserved.
                                             </div>
+                                        )}
+                                        {order.status === 'pending' && (
+                                          <div className="p-2.5 bg-indigo-50/70 border border-indigo-200 rounded-[2px]">
+                                            <p className="text-[10px] text-indigo-900 font-bold mb-1.5 flex items-center gap-1">
+                                              <CreditCard size={12} className="text-indigo-600" /> Customer paid on CHIP?
+                                            </p>
+                                            <button
+                                              onClick={() => handleVerifySingleOrderWithChip(order.id)}
+                                              disabled={verifyingOrderId === order.id}
+                                              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold uppercase tracking-wider py-1.5 px-3 rounded-[2px] transition-colors flex items-center justify-center gap-1.5"
+                                            >
+                                              {verifyingOrderId === order.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                              {verifyingOrderId === order.id ? 'Verifying with CHIP...' : 'Verify CHIP Gateway & Mark Paid'}
+                                            </button>
+                                          </div>
                                         )}
                                         <select 
                                             value={order.status} 

@@ -334,9 +334,16 @@ async function startServer() {
   // CHIP SERVER-TO-SERVER WEBHOOK & SUCCESS CALLBACK HANDLER
   // Direct asynchronous delivery from gate.chip-in.asia when payment succeeds
   // ---------------------------------------------------------------------------
-  app.post(["/api/chip/callback", "/api/chip/webhook"], async (req, res) => {
+  app.all(["/api/chip/callback", "/api/chip/webhook", "/api/chip/ipn", "/api/chip/notify"], async (req, res) => {
+    // Respond immediately to GET / HEAD requests for webhook URL validation / health check
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      return res.status(200).json({ status: "ok", message: "CHIP Webhook Endpoint is active and listening" });
+    }
+
     try {
-      const payload = req.body || {};
+      const rawBody = req.body || {};
+      const payload = rawBody.data || rawBody.purchase || rawBody.payload || rawBody;
+      
       console.log("[CHIP Webhook] Received callback notification:", JSON.stringify({
         id: payload.id,
         status: payload.status,
@@ -345,11 +352,23 @@ async function startServer() {
         is_paid: payload.is_paid
       }));
 
-      const purchaseId = payload.id;
-      const rawReference = payload.reference ? payload.reference.toString().trim() : '';
-      const status = (payload.status || '').toLowerCase();
-      const eventType = (payload.event_type || '').toLowerCase();
-      const isPaid = status === 'paid' || status === 'cleared' || status === 'settled' || status === 'completed' || eventType === 'purchase.paid' || payload.is_paid === true;
+      const purchaseId = payload.id || rawBody.id;
+      const rawReference = (payload.reference || rawBody.reference || payload.client_reference || '').toString().trim();
+      const status = (payload.status || rawBody.status || '').toLowerCase();
+      const eventType = (payload.event_type || rawBody.event_type || '').toLowerCase();
+      
+      const isPaid = 
+        status === 'paid' || 
+        status === 'cleared' || 
+        status === 'settled' || 
+        status === 'completed' || 
+        status === 'success' ||
+        eventType === 'purchase.paid' || 
+        eventType === 'payment.paid' ||
+        eventType === 'purchase.settled' ||
+        eventType === 'payment.success' ||
+        payload.is_paid === true ||
+        rawBody.is_paid === true;
 
       if (!db) {
         console.warn("[CHIP Webhook] Database not initialized.");
@@ -358,11 +377,11 @@ async function startServer() {
 
       if (isPaid && (rawReference || purchaseId)) {
         let orderDocRef = null;
-        let orderData = null;
+        let orderData: any = null;
+        const cleanRef = rawReference.replace(/^#/, '').trim();
 
         // 1. Try finding order by direct reference (doc ID)
-        if (rawReference) {
-          const cleanRef = rawReference.replace(/^#/, '').trim();
+        if (cleanRef) {
           const refDoc = doc(db, 'orders', cleanRef);
           const snap = await getDoc(refDoc);
           if (snap.exists()) {
@@ -371,10 +390,29 @@ async function startServer() {
           }
         }
 
+        // 1b. Try finding order with '#' prefix in doc ID
+        if (!orderDocRef && cleanRef) {
+          const hashDoc = doc(db, 'orders', `#${cleanRef}`);
+          const snap = await getDoc(hashDoc);
+          if (snap.exists()) {
+            orderDocRef = hashDoc;
+            orderData = { id: snap.id, ...snap.data() };
+          }
+        }
+
         // 2. Try finding order by query (id field)
-        if (!orderDocRef && rawReference) {
-          const cleanRef = rawReference.replace(/^#/, '').trim();
+        if (!orderDocRef && cleanRef) {
           const q = query(collection(db, 'orders'), where('id', '==', cleanRef), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            orderDocRef = snap.docs[0].ref;
+            orderData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+          }
+        }
+
+        // 2b. Try finding order by query with '#' prefix
+        if (!orderDocRef && cleanRef) {
+          const q = query(collection(db, 'orders'), where('id', '==', `#${cleanRef}`), limit(1));
           const snap = await getDocs(q);
           if (!snap.empty) {
             orderDocRef = snap.docs[0].ref;
@@ -392,12 +430,38 @@ async function startServer() {
           }
         }
 
+        // 4. Fallback: If not found, fetch purchase details from CHIP to get the exact reference
+        if (!orderDocRef && purchaseId) {
+          const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+          if (apiKey) {
+            try {
+              const chipResp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/${purchaseId}/`, {
+                headers: { "Authorization": `Bearer ${apiKey}` }
+              });
+              if (chipResp.ok) {
+                const chipData = await chipResp.json();
+                const fetchedRef = (chipData.reference || '').replace(/^#/, '').trim();
+                if (fetchedRef) {
+                  const refDoc = doc(db, 'orders', fetchedRef);
+                  const snap = await getDoc(refDoc);
+                  if (snap.exists()) {
+                    orderDocRef = refDoc;
+                    orderData = { id: snap.id, ...snap.data() };
+                  }
+                }
+              }
+            } catch (fallbackErr) {
+              console.warn("[CHIP Webhook] Fallback purchase lookup failed:", fallbackErr);
+            }
+          }
+        }
+
         if (orderDocRef) {
           await updateDoc(orderDocRef, {
             status: 'paid',
-            chip_purchase_id: purchaseId || (orderData as any)?.chip_purchase_id || '',
+            chip_purchase_id: purchaseId || orderData?.chip_purchase_id || '',
             chip_payment_status: status || 'paid',
-            chip_paid_at: payload.transaction_data?.paid_at || new Date().toISOString(),
+            chip_paid_at: payload.transaction_data?.paid_at || payload.paid_at || new Date().toISOString(),
             chip_event_type: eventType || 'purchase.paid',
             updatedAt: new Date().toISOString(),
             statusHistory: arrayUnion({
@@ -406,7 +470,7 @@ async function startServer() {
               source: 'chip_webhook_callback'
             })
           });
-          console.log(`[CHIP Webhook] SUCCESS: Order #${rawReference || purchaseId} has been marked as PAID in Firestore!`);
+          console.log(`[CHIP Webhook] SUCCESS: Order #${rawReference || purchaseId} marked as PAID in Firestore!`);
         } else {
           console.warn(`[CHIP Webhook] Received paid callback but no order matching reference "${rawReference}" or purchase ID "${purchaseId}" was found in Firestore.`);
         }
@@ -416,35 +480,33 @@ async function startServer() {
       return res.status(200).json({ status: "ok", received: true, reference: rawReference, purchaseId });
     } catch (err: any) {
       console.error("[CHIP Webhook] Error processing callback:", err);
-      // Return 200 so CHIP does not spam retries on transient syntax errors
       return res.status(200).json({ status: "error_logged", error: err.message });
     }
   });
 
   // ---------------------------------------------------------------------------
-  // CHIP ORDER VERIFICATION & RESCUE ENDPOINT
+  // CHIP ORDER VERIFICATION & RESCUE HELPER
   // Actively verifies an order against the CHIP Gateway API and rescues it to PAID
   // ---------------------------------------------------------------------------
-  const handleVerifyOrder = async (orderIdParam: string, res: any) => {
-    try {
-      const cleanOrderId = (orderIdParam || '').replace(/^#/, '').trim();
-      if (!cleanOrderId) {
-        return res.status(400).json({ error: "Order ID required" });
-      }
+  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{ paid: boolean; status: string; rescued?: boolean; order?: any; note?: string }> => {
+    const cleanOrderId = (orderIdParam || '').replace(/^#/, '').trim();
+    if (!cleanOrderId || !db) {
+      return { paid: false, status: 'unknown', note: 'Missing order ID or DB' };
+    }
 
-      const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+    // 1. Fetch current order from Firestore
+    let orderDocRef = doc(db, 'orders', cleanOrderId);
+    let orderSnap = await getDoc(orderDocRef);
+    let orderData: any = null;
 
-      if (!db) {
-        return res.status(500).json({ error: "Database not connected" });
-      }
-
-      // 1. Fetch current order from Firestore
-      let orderDocRef = doc(db, 'orders', cleanOrderId);
-      let orderSnap = await getDoc(orderDocRef);
-      let orderData: any = null;
-
-      if (orderSnap.exists()) {
-        orderData = { id: orderSnap.id, ...orderSnap.data() };
+    if (orderSnap.exists()) {
+      orderData = { id: orderSnap.id, ...orderSnap.data() };
+    } else {
+      const hashDoc = doc(db, 'orders', `#${cleanOrderId}`);
+      const hashSnap = await getDoc(hashDoc);
+      if (hashSnap.exists()) {
+        orderDocRef = hashDoc;
+        orderData = { id: hashSnap.id, ...hashSnap.data() };
       } else {
         const q = query(collection(db, 'orders'), where('id', '==', cleanOrderId), limit(1));
         const snap = await getDocs(q);
@@ -453,102 +515,196 @@ async function startServer() {
           orderData = { id: snap.docs[0].id, ...snap.docs[0].data() };
         }
       }
+    }
 
-      if (!orderData) {
-        return res.status(404).json({ error: "Order not found in database", orderId: cleanOrderId });
-      }
+    if (!orderData) {
+      return { paid: false, status: 'not_found', note: 'Order not found in database' };
+    }
 
-      // If already paid/shipped/delivered, return success immediately
-      if (['paid', 'packed', 'shipped', 'delivered'].includes(orderData.status)) {
-        return res.json({
-          paid: true,
-          status: orderData.status,
-          order: orderData,
-          alreadyPaid: true
-        });
-      }
+    // If already paid/shipped/delivered, return success immediately
+    if (['paid', 'packed', 'shipped', 'delivered'].includes(orderData.status)) {
+      return {
+        paid: true,
+        status: orderData.status,
+        order: orderData
+      };
+    }
 
-      // 2. Check with CHIP Gateway API
-      if (!apiKey) {
-        return res.json({
-          paid: false,
-          status: orderData.status,
-          order: orderData,
-          note: "CHIP_API key not available for live gateway query"
-        });
-      }
-
-      let chipPurchase: any = null;
-
-      // Try checking by known purchase ID
-      if (orderData.chip_purchase_id) {
-        try {
-          const resp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/${orderData.chip_purchase_id}/`, {
-            headers: { "Authorization": `Bearer ${apiKey}` }
-          });
-          if (resp.ok) {
-            chipPurchase = await resp.json();
-          }
-        } catch (fetchErr) {
-          console.warn(`[CHIP Verify] Could not query purchase ${orderData.chip_purchase_id}:`, fetchErr);
-        }
-      }
-
-      const isChipPaid = chipPurchase && (
-        chipPurchase.status === 'paid' ||
-        chipPurchase.status === 'cleared' ||
-        chipPurchase.status === 'settled' ||
-        chipPurchase.status === 'completed' ||
-        chipPurchase.is_paid === true
-      );
-
-      if (isChipPaid) {
-        // RESCUE ORDER: Update to PAID in Firestore!
-        await updateDoc(orderDocRef, {
-          status: 'paid',
-          chip_payment_status: chipPurchase.status,
-          chip_verified_at: new Date().toISOString(),
-          chip_paid_at: chipPurchase.transaction_data?.paid_at || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          statusHistory: arrayUnion({
-            status: 'paid',
-            timestamp: new Date().toISOString(),
-            source: 'chip_gateway_live_verify_rescue'
-          })
-        });
-
-        console.log(`[CHIP Verify] RESCUED Order #${cleanOrderId} from "${orderData.status}" to "PAID" via CHIP gateway verification!`);
-        orderData.status = 'paid';
-
-        return res.json({
-          paid: true,
-          status: 'paid',
-          rescued: true,
-          chip_status: chipPurchase.status,
-          order: orderData
-        });
-      }
-
-      return res.json({
+    if (!apiKey) {
+      return {
         paid: false,
         status: orderData.status,
-        chip_status: chipPurchase?.status || 'unknown',
-        order: orderData
+        order: orderData,
+        note: "CHIP_API key not available for live gateway query"
+      };
+    }
+
+    let chipPurchase: any = null;
+
+    // A. Try checking by known purchase ID
+    if (orderData.chip_purchase_id) {
+      try {
+        const resp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/${orderData.chip_purchase_id}/`, {
+          headers: { "Authorization": `Bearer ${apiKey}` }
+        });
+        if (resp.ok) {
+          chipPurchase = await resp.json();
+        }
+      } catch (fetchErr) {
+        console.warn(`[CHIP Verify] Could not query purchase ${orderData.chip_purchase_id}:`, fetchErr);
+      }
+    }
+
+    // B. Fallback: Search CHIP Gateway by reference if purchase ID wasn't stored or not paid
+    if (!chipPurchase || (!chipPurchase.is_paid && chipPurchase.status !== 'paid' && chipPurchase.status !== 'cleared' && chipPurchase.status !== 'settled' && chipPurchase.status !== 'completed')) {
+      try {
+        // Query CHIP purchase list filtered by reference
+        const searchRefs = [cleanOrderId, `#${cleanOrderId}`];
+        for (const refToSearch of searchRefs) {
+          const listResp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/?reference=${encodeURIComponent(refToSearch)}`, {
+            headers: { "Authorization": `Bearer ${apiKey}` }
+          });
+          if (listResp.ok) {
+            const listData = await listResp.json();
+            const results = Array.isArray(listData) ? listData : listData?.results || [];
+            const paidMatch = results.find((p: any) => 
+              p.status === 'paid' || p.status === 'cleared' || p.status === 'settled' || p.status === 'completed' || p.is_paid === true
+            );
+            if (paidMatch) {
+              chipPurchase = paidMatch;
+              break;
+            } else if (results.length > 0 && !chipPurchase) {
+              chipPurchase = results[0];
+            }
+          }
+        }
+      } catch (searchErr) {
+        console.warn(`[CHIP Verify] Could not search purchases by reference for #${cleanOrderId}:`, searchErr);
+      }
+    }
+
+    const isChipPaid = chipPurchase && (
+      chipPurchase.status === 'paid' ||
+      chipPurchase.status === 'cleared' ||
+      chipPurchase.status === 'settled' ||
+      chipPurchase.status === 'completed' ||
+      chipPurchase.status === 'success' ||
+      chipPurchase.is_paid === true
+    );
+
+    if (isChipPaid) {
+      // RESCUE ORDER: Update to PAID in Firestore!
+      await updateDoc(orderDocRef, {
+        status: 'paid',
+        chip_purchase_id: chipPurchase.id || orderData.chip_purchase_id || '',
+        chip_payment_status: chipPurchase.status || 'paid',
+        chip_verified_at: new Date().toISOString(),
+        chip_paid_at: chipPurchase.transaction_data?.paid_at || chipPurchase.paid_at || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        statusHistory: arrayUnion({
+          status: 'paid',
+          timestamp: new Date().toISOString(),
+          source: 'chip_gateway_live_verify_rescue'
+        })
       });
 
-    } catch (err: any) {
-      console.error("[CHIP Verify] Error verifying order:", err);
-      return res.status(500).json({ error: err.message || "Failed to verify order" });
+      console.log(`[CHIP Verify] RESCUED Order #${cleanOrderId} from "${orderData.status}" to "PAID" via CHIP gateway verification!`);
+      orderData.status = 'paid';
+
+      return {
+        paid: true,
+        status: 'paid',
+        rescued: true,
+        order: orderData
+      };
     }
+
+    return {
+      paid: false,
+      status: orderData.status,
+      order: orderData
+    };
   };
 
   app.get("/api/chip/verify/:orderId", async (req, res) => {
-    return handleVerifyOrder(req.params.orderId, res);
+    try {
+      const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+      const result = await verifyAndRescueSingleOrder(req.params.orderId, apiKey);
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[CHIP Verify] Error:", err);
+      return res.status(500).json({ error: err.message || "Failed to verify order" });
+    }
   });
 
   app.post("/api/chip/verify", async (req, res) => {
-    const orderId = req.body.orderId || req.body.order_id || req.body.reference;
-    return handleVerifyOrder(orderId, res);
+    try {
+      const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+      const orderId = req.body.orderId || req.body.order_id || req.body.reference;
+      const result = await verifyAndRescueSingleOrder(orderId, apiKey);
+      return res.json(result);
+    } catch (err: any) {
+      console.error("[CHIP Verify] Error:", err);
+      return res.status(500).json({ error: err.message || "Failed to verify order" });
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // BATCH SYNC: AUTO-VERIFY ALL PENDING ORDERS WITH CHIP GATEWAY
+  // ---------------------------------------------------------------------------
+  app.all("/api/chip/sync-pending", async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(500).json({ error: "Database not connected" });
+      }
+
+      const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
+      if (!apiKey) {
+        return res.status(400).json({ error: "CHIP_API key not configured" });
+      }
+
+      // Query recent pending orders in Firestore
+      const q = query(
+        collection(db, 'orders'),
+        where('status', '==', 'pending'),
+        limit(50)
+      );
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        return res.json({ synced: 0, rescued: 0, message: "No pending orders to verify." });
+      }
+
+      const rescuedOrders: string[] = [];
+      let checkedCount = 0;
+
+      for (const docSnap of snapshot.docs) {
+        checkedCount++;
+        const orderId = docSnap.id;
+        try {
+          const resObj = await verifyAndRescueSingleOrder(orderId, apiKey);
+          if (resObj.paid && resObj.rescued) {
+            rescuedOrders.push(orderId);
+          }
+        } catch (singleErr) {
+          console.warn(`[CHIP Sync Batch] Error checking order #${orderId}:`, singleErr);
+        }
+      }
+
+      console.log(`[CHIP Sync Batch] Checked ${checkedCount} pending orders, rescued ${rescuedOrders.length} to PAID:`, rescuedOrders);
+
+      return res.json({
+        synced: checkedCount,
+        rescued: rescuedOrders.length,
+        rescuedOrderIds: rescuedOrders,
+        message: rescuedOrders.length > 0 
+          ? `Successfully synced with CHIP: ${rescuedOrders.length} order(s) updated to Paid!`
+          : `Synced ${checkedCount} pending orders with CHIP. All pending statuses are up to date.`
+      });
+    } catch (err: any) {
+      console.error("[CHIP Sync Batch] Error:", err);
+      return res.status(500).json({ error: err.message || "Failed to batch sync pending orders" });
+    }
   });
 
   // API endpoints
