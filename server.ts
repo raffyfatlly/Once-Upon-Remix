@@ -1,18 +1,40 @@
 import express from "express";
 import path from "path";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import nodemailer from "nodemailer";
 import { db } from "./firebase";
 import { collection, query, where, getDocs, limit, doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 
+export const DEFAULT_CHIP_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAx4pspTG+p6wBuVxnYUXT
+a3rEfa2fq3sTf1lPfNciE9ZYlZgyzaLWhJ2afsYH/q7U6JZ/KYgjOwtGhl9TMtdU
+yFOAMvwfaPS8I2KYFhXP8eoeM7Wb0RmKIZGQHa37kZX2YMD8PnUIOPrBaKo9yNHB
+GaOGxTbkB2svvh6Kvte8EJcXY4AuO9S1NapTP+JwKZ4cyWJPtKvwNIxEnH6GszsT
+KKQG8GqGBfNKqAZeZ3svct2fIS1MxrmNJiVnWkheoE2StTOmm2q0Rx3IMczmO3jF
+flec6TUu+eVlk+fsfIhxwkizkdR+eZmbLGbC7VeYFrUQq5Wj9ZWHrRI/kEbCjo25
+ntPwHJYsyqRmVsh3mfhP+lDo0McdJ2EGDVubVJ4ObY4oS7SQB7h9TP24gnqF9bEJ
+c2DQt5IDq9gikqtb4FKoI2zzeO7ElF4NHsXilww5N7mak5k7zENUudytIp5/jWGz
+dDziUycgJOaBuwgOrXdCzNRV5pc5KskSaCdTtd2JhWVZAgMBAAE=
+-----END PUBLIC KEY-----`;
+
 export const app = express();
 
 async function startServer() {
   const PORT = 3000;
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    }
+  }));
+  app.use(express.urlencoded({
+    extended: true,
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    }
+  }));
 
   // ---------------------------------------------------------------------------
   // CAKENIC CLEAN URL SERVER-SIDE REDIRECT HANDLER (/cakenic, /cakenic-event)
@@ -165,10 +187,12 @@ async function startServer() {
   app.get("/api/chip/status", (req, res) => {
     const apiKey = (process.env.CHIP_API || process.env.CHIP_SECRET || process.env.CHIP_KEY || process.env.VITE_CHIP_API || '').trim().replace(/^["']|["']$/g, '');
     const brandId = (process.env.CHIP_ID || process.env.CHIP_BRAND_ID || process.env.VITE_CHIP_ID || '').trim().replace(/^["']|["']$/g, '');
+    const publicKey = (process.env.CHIP_PUBLIC_KEY || DEFAULT_CHIP_PUBLIC_KEY || '').trim();
     return res.json({
       configured: Boolean(apiKey && brandId),
       hasApiKey: Boolean(apiKey),
       hasBrandId: Boolean(brandId),
+      hasPublicKey: Boolean(publicKey),
       brandIdPreview: brandId ? `${brandId.substring(0, 4)}...${brandId.substring(Math.max(0, brandId.length - 4))}` : null
     });
   });
@@ -357,6 +381,23 @@ async function startServer() {
       const rawReference = (payload.reference || rawBody.reference || payload.client_reference || '').toString().trim();
       const status = (payload.status || rawBody.status || '').toLowerCase();
       const eventType = (payload.event_type || rawBody.event_type || '').toLowerCase();
+      
+      // Optional cryptographic RSA signature check with CHIP Public Key
+      const signatureHeader = req.get('x-signature') || req.get('http_x_signature') || req.get('X-Signature');
+      const publicKey = (process.env.CHIP_PUBLIC_KEY || DEFAULT_CHIP_PUBLIC_KEY || '').trim();
+      if (signatureHeader && publicKey && (req as any).rawBody) {
+        try {
+          const isSignatureValid = crypto.verify(
+            'RSA-SHA256',
+            Buffer.from((req as any).rawBody, 'utf8'),
+            publicKey,
+            Buffer.from(signatureHeader, 'base64')
+          );
+          console.log(`[CHIP Webhook] RSA Signature verification: ${isSignatureValid ? 'PASSED (Authentic CHIP)' : 'MISMATCH'}`);
+        } catch (sigErr: any) {
+          console.warn(`[CHIP Webhook] Signature validation note: ${sigErr.message}`);
+        }
+      }
       
       const isPaid = 
         status === 'paid' || 
