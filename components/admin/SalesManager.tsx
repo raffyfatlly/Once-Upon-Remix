@@ -499,16 +499,29 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
   const [chipSyncResult, setChipSyncResult] = useState<string | null>(null);
   const [verifyingOrderId, setVerifyingOrderId] = useState<string | null>(null);
   const [showWebhookModal, setShowWebhookModal] = useState<boolean>(false);
-  const [copiedWebhook, setCopiedWebhook] = useState<boolean>(false);
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const [customDomainInput, setCustomDomainInput] = useState<string>('https://onceuponmy.com');
 
-  const webhookUrl = typeof window !== 'undefined' 
+  const productionWebhookUrl = 'https://onceuponmy.com/api/chip/webhook';
+  const currentEnvWebhookUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/chip/webhook` 
     : 'https://onceuponmy.com/api/chip/webhook';
 
-  const handleCopyWebhookUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    setCopiedWebhook(true);
-    setTimeout(() => setCopiedWebhook(false), 3000);
+  const normalizedCustomWebhookUrl = (() => {
+    let d = customDomainInput.trim();
+    if (!d) return productionWebhookUrl;
+    if (!d.startsWith('http://') && !d.startsWith('https://')) {
+      d = 'https://' + d;
+    }
+    d = d.replace(/\/+$/, '');
+    if (d.endsWith('/api/chip/webhook')) return d;
+    return `${d}/api/chip/webhook`;
+  })();
+
+  const handleCopyUrl = (url: string, type: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedType(type);
+    setTimeout(() => setCopiedType(null), 3000);
   };
 
   const handleSyncPendingWithChip = async () => {
@@ -1597,15 +1610,15 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
         {/* CHIP WEBHOOK SETUP GUIDE MODAL */}
         {showWebhookModal && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowWebhookModal(false)}>
-            <div className="bg-white max-w-lg w-full p-6 md:p-8 rounded-[2px] shadow-2xl border border-brand-latte/20 relative" onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-between items-start mb-4">
+            <div className="bg-white max-w-xl w-full p-6 md:p-8 rounded-[2px] shadow-2xl border border-brand-latte/20 relative max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex justify-between items-start mb-4 border-b border-brand-latte/15 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-brand-flamingo/10 text-brand-flamingo rounded-[2px]">
                     <CreditCard size={20} />
                   </div>
                   <div>
                     <h3 className="font-serif text-lg font-bold text-gray-900">CHIP Webhook Configuration</h3>
-                    <p className="text-xs text-gray-500">Ensure instant, real-time status updates from CHIP</p>
+                    <p className="text-xs text-gray-500">Live Production & Testing Webhook Endpoints</p>
                   </div>
                 </div>
                 <button onClick={() => setShowWebhookModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
@@ -1614,45 +1627,105 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
               </div>
 
               <div className="space-y-4 text-xs text-gray-700 leading-relaxed">
-                <div>
-                  <label className="font-bold uppercase tracking-wider text-[10px] text-gray-500 block mb-1">
-                    Your Server Webhook URL
-                  </label>
-                  <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border border-gray-200 font-mono text-xs text-gray-800 break-all select-all">
-                    <span className="flex-1">{webhookUrl}</span>
+                
+                {/* 1. Production Live Store Webhook (Recommended) */}
+                <div className="bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-[2px]">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="font-bold uppercase tracking-wider text-[10px] text-emerald-900 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      1. Production Store Webhook URL (Recommended for CHIP Portal)
+                    </label>
+                    <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
+                      Live Store
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white p-2 rounded border border-emerald-200 font-mono text-xs text-gray-900 break-all select-all">
+                    <span className="flex-1 font-bold text-emerald-900">{productionWebhookUrl}</span>
                     <button 
-                      onClick={handleCopyWebhookUrl}
-                      className="bg-brand-flamingo hover:bg-brand-flamingo/90 text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center gap-1 shrink-0 transition-colors"
+                      onClick={() => handleCopyUrl(productionWebhookUrl, 'prod')}
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center gap-1 shrink-0 transition-colors shadow-xs"
                     >
-                      {copiedWebhook ? <Check size={12} /> : <ClipboardCopy size={12} />}
-                      {copiedWebhook ? 'Copied' : 'Copy'}
+                      {copiedType === 'prod' ? <Check size={12} /> : <ClipboardCopy size={12} />}
+                      {copiedType === 'prod' ? 'Copied' : 'Copy URL'}
                     </button>
+                  </div>
+                  <p className="text-[10px] text-emerald-800 mt-1.5">
+                    Use this URL inside <strong>gate.chip-in.asia &rarr; Developers &rarr; Webhooks</strong> so all customer payments from your live store are processed 24/7.
+                  </p>
+                </div>
+
+                {/* 2. Custom Domain Builder */}
+                <div className="bg-brand-grey/5 border border-brand-latte/20 p-3.5 rounded-[2px] space-y-2">
+                  <label className="font-bold uppercase tracking-wider text-[10px] text-gray-700 block">
+                    2. Using a Custom or Alternate Domain?
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input 
+                      type="text" 
+                      value={customDomainInput}
+                      onChange={(e) => setCustomDomainInput(e.target.value)}
+                      placeholder="e.g. https://onceuponmy.com or your domain"
+                      className="flex-1 bg-white border border-brand-latte/30 px-3 py-1.5 text-xs rounded-[2px] font-mono focus:outline-none focus:border-brand-flamingo"
+                    />
+                    <button 
+                      onClick={() => handleCopyUrl(normalizedCustomWebhookUrl, 'custom')}
+                      className="bg-brand-gold hover:bg-brand-gold/90 text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center justify-center gap-1 shrink-0 transition-colors"
+                    >
+                      {copiedType === 'custom' ? <Check size={12} /> : <ClipboardCopy size={12} />}
+                      {copiedType === 'custom' ? 'Copied Custom' : 'Copy Custom URL'}
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-gray-500 font-mono break-all">
+                    Resolved: {normalizedCustomWebhookUrl}
                   </div>
                 </div>
 
-                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded text-amber-900 space-y-2">
-                  <div className="font-bold uppercase tracking-wider text-[10px] text-amber-800 flex items-center gap-1.5">
-                    <AlertTriangle size={13} className="text-amber-600" />
-                    How to enable in CHIP Dashboard:
+                {/* 3. Development / Sandbox Container Preview */}
+                <div className="bg-amber-50/60 border border-amber-200/80 p-3.5 rounded-[2px]">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="font-bold uppercase tracking-wider text-[10px] text-amber-900 flex items-center gap-1.5">
+                      <AlertTriangle size={12} className="text-amber-600" />
+                      3. Current Environment / Dev Preview URL
+                    </label>
+                    <span className="text-[9px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                      Sandbox Only
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-white p-2 rounded border border-amber-200 font-mono text-[11px] text-gray-700 break-all select-all">
+                    <span className="flex-1">{currentEnvWebhookUrl}</span>
+                    <button 
+                      onClick={() => handleCopyUrl(currentEnvWebhookUrl, 'dev')}
+                      className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center gap-1 shrink-0 transition-colors"
+                    >
+                      {copiedType === 'dev' ? <Check size={12} /> : <ClipboardCopy size={12} />}
+                      {copiedType === 'dev' ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-amber-800 mt-1">
+                    ⚠️ <em>Note:</em> This URL corresponds to your active editing/preview session container. Only use this if you are actively testing test webhooks in sandbox mode.
+                  </p>
+                </div>
+
+                {/* Setup Instructions */}
+                <div className="bg-brand-latte/10 border border-brand-latte/20 p-3.5 rounded text-gray-800 space-y-2">
+                  <div className="font-bold uppercase tracking-wider text-[10px] text-gray-900 flex items-center gap-1.5">
+                    <Globe size={13} className="text-brand-flamingo" />
+                    How to configure in CHIP Portal:
                   </div>
                   <ol className="list-decimal list-inside space-y-1 text-xs">
                     <li>Log in to <a href="https://gate.chip-in.asia" target="_blank" rel="noreferrer" className="underline font-bold text-brand-flamingo">gate.chip-in.asia</a></li>
                     <li>Go to <strong>Developers</strong> &rarr; <strong>Webhooks</strong></li>
-                    <li>Click <strong>Add Webhook</strong> and paste the URL above</li>
+                    <li>Click <strong>Add Webhook</strong> and paste your production URL: <code className="bg-white px-1 py-0.5 rounded border border-gray-200 text-brand-flamingo font-bold">https://onceuponmy.com/api/chip/webhook</code></li>
                     <li>Subscribe to <strong>purchase.paid</strong> (or all events) & click <strong>Save</strong></li>
                   </ol>
                 </div>
 
-                <p className="text-gray-500 text-[11px]">
-                  💡 <strong>Automatic Backup:</strong> Even if a webhook is delayed by network lag, Once Upon automatically queries CHIP when you click <strong>"Sync CHIP Orders"</strong> or when the customer returns from payment.
-                </p>
-
                 <div className="pt-2 flex justify-end">
                   <button 
                     onClick={() => setShowWebhookModal(false)}
-                    className="bg-brand-grey/20 hover:bg-brand-grey/30 text-gray-800 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-[2px]"
+                    className="bg-brand-grey/20 hover:bg-brand-grey/30 text-gray-800 px-5 py-2 text-xs font-bold uppercase tracking-wider rounded-[2px]"
                   >
-                    Close
+                    Done
                   </button>
                 </div>
               </div>

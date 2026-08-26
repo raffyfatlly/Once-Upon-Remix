@@ -1,7 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, ArrowRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { updateOrderStatusInDb, restoreStockForOrder, getOrderById } from '../firebase';
 import { trackPurchase } from '../analytics';
 import { CakenicTicketView } from './CakenicTicketView';
@@ -10,18 +10,81 @@ import { Order } from '../types';
 export const PaymentCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'cancelled'>('loading');
+  const [status, setStatus] = useState<'loading' | 'success' | 'failed' | 'cancelled' | 'unconfirmed'>('loading');
   const [displayOrderId, setDisplayOrderId] = useState<string>('');
   const [order, setOrder] = useState<Order | null>(null);
+  const [isManualChecking, setIsManualChecking] = useState<boolean>(false);
+  const [checkFeedback, setCheckFeedback] = useState<string>('');
+  const isCancelledRef = useRef<boolean>(false);
   
+  const checkPaymentWithGateway = async (orderId: string): Promise<boolean> => {
+    try {
+      const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
+      if (verifyResp.ok) {
+        const verifyData = await verifyResp.json();
+        if (verifyData && verifyData.paid === true) {
+          return true;
+        }
+      }
+    } catch (verifyErr) {
+      console.warn("[PaymentCallback] Live verify fetch failed:", verifyErr);
+    }
+    return false;
+  };
+
+  const handleManualRecheck = async () => {
+    if (!displayOrderId) return;
+    setIsManualChecking(true);
+    setCheckFeedback('Connecting to CHIP gateway...');
+    try {
+      const isPaid = await checkPaymentWithGateway(displayOrderId);
+      if (isPaid) {
+        setCheckFeedback('✅ Payment confirmed! Updating order...');
+        await updateOrderStatusInDb(displayOrderId, 'paid');
+        const refreshedOrder = await getOrderById(displayOrderId);
+        if (refreshedOrder) {
+          setOrder(refreshedOrder);
+          try {
+            trackPurchase(displayOrderId, refreshedOrder.total);
+          } catch (_) {}
+        }
+        setStatus('success');
+      } else {
+        const dbOrder = await getOrderById(displayOrderId);
+        if (dbOrder && ['paid', 'packed', 'shipped', 'delivered'].includes(dbOrder.status)) {
+          setOrder(dbOrder);
+          setStatus('success');
+        } else {
+          setCheckFeedback('Payment is not yet confirmed by bank. Please allow 1-2 minutes or check your bank statement.');
+        }
+      }
+    } catch (err: any) {
+      setCheckFeedback('Verification check error: ' + err.message);
+    } finally {
+      setIsManualChecking(false);
+    }
+  };
+
+  const handleExplicitCancelOrder = async () => {
+    if (!displayOrderId) return;
+    if (window.confirm("Are you sure you want to cancel this order reservation and return items to stock?")) {
+      try {
+        await restoreStockForOrder(displayOrderId, 'cancelled');
+        setStatus('cancelled');
+      } catch (e) {
+        console.error("Cancel order error:", e);
+      }
+    }
+  };
+
   useEffect(() => {
+    isCancelledRef.current = false;
     const result = searchParams.get('result');
     const orderId = searchParams.get('order');
-    
     const method = searchParams.get('method');
     if (orderId) setDisplayOrderId(orderId);
     
-    const handleCallback = async () => {
+    const runVerificationPipeline = async () => {
       if (!orderId) {
         setStatus('failed');
         return;
@@ -39,94 +102,83 @@ export const PaymentCallback: React.FC = () => {
           return;
         }
 
-        // If order was ALREADY marked as paid (by CHIP server webhook or previous session)
+        // 1. If order was ALREADY marked as paid (by CHIP server webhook or background sync)
         if (fetchedOrder && (fetchedOrder.status === 'paid' || fetchedOrder.status === 'packed' || fetchedOrder.status === 'shipped' || fetchedOrder.status === 'delivered')) {
           setStatus('success');
           setOrder(fetchedOrder);
           return;
         }
 
+        // 2. Direct success redirect: mark as paid immediately
         if (result === 'success') {
-          // Payment Successful: Stock was already deducted at checkout.
-          // Just update status to Paid.
           await updateOrderStatusInDb(orderId, 'paid');
           setStatus('success');
           if (fetchedOrder) {
             setOrder({ ...fetchedOrder, status: 'paid' });
-          }
-          
-          // Track purchase in self-hosted analytics
-          try {
-            if (fetchedOrder) {
+            try {
               trackPurchase(orderId, fetchedOrder.total);
+            } catch (trackingErr) {
+              console.warn("Purchase tracking failed (silent):", trackingErr);
             }
-          } catch (trackingErr) {
-            console.warn("Purchase tracking failed (silent):", trackingErr);
           }
           return;
         }
 
-        // 🛡️ CRITICAL RESCUE CHECK:
-        // Even if result query says "cancelled" or "failed" or is empty (e.g. user pressed Back after paying,
-        // or browser popup issue), verify directly with CHIP Gateway API before taking any destructive action!
-        let isConfirmedPaidOnGateway = false;
-        try {
-          const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
-          if (verifyResp.ok) {
-            const verifyData = await verifyResp.json();
-            if (verifyData && verifyData.paid === true) {
-              isConfirmedPaidOnGateway = true;
-              console.log(`[PaymentCallback] CHIP Gateway confirmed Order #${orderId} is PAID! Rescuing order.`);
-              setStatus('success');
-              if (fetchedOrder) {
-                setOrder({ ...fetchedOrder, status: 'paid' });
-                try {
-                  trackPurchase(orderId, fetchedOrder.total);
-                } catch (_) {}
-              }
-              return;
-            }
-          }
-        } catch (verifyErr) {
-          console.warn("[PaymentCallback] Live verify fetch failed:", verifyErr);
-        }
+        // 3. Multi-attempt polling rescue check
+        // Often customers authorize on banking app and redirect takes 2-8 seconds to reflect on CHIP.
+        // We poll CHIP up to 4 times before deciding.
+        const delays = [500, 2000, 3000, 3500];
+        for (let attempt = 0; attempt < delays.length; attempt++) {
+          if (isCancelledRef.current) return;
+          await new Promise(r => setTimeout(r, delays[attempt]));
 
-        // If gateway explicitly confirmed NOT paid, and order is still not paid:
-        if (!isConfirmedPaidOnGateway) {
-          // Re-check order status from DB once more to ensure webhook didn't set it to paid in the background
-          const doubleCheckOrder = await getOrderById(orderId);
-          if (doubleCheckOrder && (doubleCheckOrder.status === 'paid' || doubleCheckOrder.status === 'packed' || doubleCheckOrder.status === 'shipped')) {
+          // Live check with gateway
+          const isPaid = await checkPaymentWithGateway(orderId);
+          if (isPaid) {
+            console.log(`[PaymentCallback] CHIP Gateway confirmed Order #${orderId} is PAID on attempt ${attempt + 1}!`);
+            await updateOrderStatusInDb(orderId, 'paid');
+            const latestOrder = await getOrderById(orderId);
+            if (latestOrder) {
+              setOrder(latestOrder);
+              try {
+                trackPurchase(orderId, latestOrder.total);
+              } catch (_) {}
+            }
             setStatus('success');
-            setOrder(doubleCheckOrder);
             return;
           }
 
-          if (result === 'failed') {
-            await restoreStockForOrder(orderId, 'failed');
-            setStatus('failed');
-            if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'failed' });
-          } else if (result === 'cancelled') {
-            await restoreStockForOrder(orderId, 'cancelled');
-            setStatus('cancelled');
-            if (fetchedOrder) setOrder({ ...fetchedOrder, status: 'cancelled' });
-          } else {
-            await restoreStockForOrder(orderId, 'failed');
-            setStatus('failed');
+          // Double check database in case server webhook resolved it
+          const latestDbOrder = await getOrderById(orderId);
+          if (latestDbOrder && ['paid', 'packed', 'shipped', 'delivered'].includes(latestDbOrder.status)) {
+            setOrder(latestDbOrder);
+            setStatus('success');
+            return;
           }
+        }
+
+        // If after all polling attempts the payment is still not confirmed:
+        // 🛡️ CRITICAL SAFETY: DO NOT automatically destroy/cancel the order immediately!
+        // Keep order in pending state so late webhooks can still settle it, and offer manual re-verify.
+        if (result === 'cancelled') {
+          setStatus('unconfirmed');
+        } else if (result === 'failed') {
+          setStatus('failed');
+        } else {
+          setStatus('unconfirmed');
         }
       } catch (error) {
         console.error("Failed to update order status:", error);
         if (result === 'success') setStatus('success');
-        else if (result === 'cancelled') setStatus('cancelled');
-        else setStatus('failed');
+        else setStatus('unconfirmed');
       }
     };
 
-    const timer = setTimeout(() => {
-      handleCallback();
-    }, 1000);
+    runVerificationPipeline();
 
-    return () => clearTimeout(timer);
+    return () => {
+      isCancelledRef.current = true;
+    };
   }, [searchParams]);
 
   // Determine if this is a Cakenic order or Once Upon store order
@@ -150,14 +202,14 @@ export const PaymentCallback: React.FC = () => {
           isCakenicOrder ? (
             <div className="flex flex-col items-center bg-[#FBF6F1] p-10 rounded-[32px] border border-[#332524]/10 shadow-lg max-w-md mx-auto animate-pulse">
               <Loader2 size={44} className="text-[#E3A099] animate-spin mb-5" />
-              <h2 className="font-serif text-2xl sm:text-3xl text-[#332524]">Processing Ticket Status...</h2>
-              <p className="text-[#6B5450] text-xs mt-2 font-medium">Updating your Cakenic event details</p>
+              <h2 className="font-serif text-2xl sm:text-3xl text-[#332524]">Verifying Ticket Payment...</h2>
+              <p className="text-[#6B5450] text-xs mt-2 font-medium">Checking authorization with payment gateway</p>
             </div>
           ) : (
             <div className="flex flex-col items-center bg-white p-10 rounded-[32px] border border-gray-100 shadow-lg max-w-md mx-auto">
               <Loader2 size={44} className="text-brand-flamingo animate-spin mb-5" />
-              <h2 className="font-serif text-2xl sm:text-3xl text-gray-900">Confirming Your Order...</h2>
-              <p className="text-gray-500 text-xs mt-2 font-medium">Updating your payment and order details</p>
+              <h2 className="font-serif text-2xl sm:text-3xl text-gray-900">Verifying Payment Status...</h2>
+              <p className="text-gray-500 text-xs mt-2 font-medium">Checking bank authorization with CHIP Gateway</p>
             </div>
           )
         )}
@@ -177,7 +229,7 @@ export const PaymentCallback: React.FC = () => {
               </div>
               <h2 className="font-serif text-2xl font-semibold mb-2">Cakenic Reservation Update</h2>
               <p className="text-xs text-[#6B5450] mb-6">
-                {status === 'cancelled' ? 'Your ticket reservation was cancelled.' : 'Payment could not be confirmed.'}
+                {status === 'cancelled' ? 'Your ticket reservation was cancelled.' : 'Payment is currently pending verification.'}
               </p>
               <button 
                 onClick={() => navigate('/cakenic')}
@@ -215,28 +267,95 @@ export const PaymentCallback: React.FC = () => {
               </div>
             )}
 
+            {/* UNCONFIRMED / PENDING AUTHORIZATION STATE */}
+            {status === 'unconfirmed' && (
+              <div className="flex flex-col items-center animate-slide-up">
+                <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle size={40} className="text-amber-500" />
+                </div>
+                <h1 className="font-serif text-2xl md:text-3xl text-gray-900 mb-2">Payment Authorization Pending</h1>
+                {displayOrderId && (
+                  <div className="mb-3 bg-amber-50 border border-amber-200 px-4 py-1 rounded-full text-xs font-mono text-amber-800 font-bold">
+                    Order #{displayOrderId}
+                  </div>
+                )}
+                <p className="font-sans text-gray-600 mb-4 text-xs sm:text-sm leading-relaxed">
+                  If your bank or card was already charged, your payment is being processed by the gateway. You do not need to pay twice.
+                </p>
+
+                {checkFeedback && (
+                  <div className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs p-3 rounded mb-4 animate-fade-in">
+                    {checkFeedback}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2.5 w-full">
+                  <button 
+                    onClick={handleManualRecheck}
+                    disabled={isManualChecking}
+                    className="w-full bg-brand-flamingo hover:bg-brand-flamingo/95 text-white py-3 font-sans uppercase tracking-[0.15em] text-[10px] font-bold transition-colors rounded-full flex items-center justify-center gap-2 shadow-md disabled:opacity-50"
+                  >
+                    {isManualChecking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    {isManualChecking ? 'Checking CHIP Gateway...' : 'Check Payment Status Now'}
+                  </button>
+                  
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => navigate('/checkout')}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 font-sans uppercase tracking-[0.15em] text-[10px] font-bold rounded-full transition-colors"
+                    >
+                      Return to Checkout
+                    </button>
+                    <button 
+                      onClick={handleExplicitCancelOrder}
+                      className="flex-1 text-red-500 hover:bg-red-50 py-2.5 font-sans uppercase tracking-[0.15em] text-[10px] font-bold rounded-full transition-colors border border-red-200"
+                    >
+                      Cancel Order
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {status === 'failed' && (
               <div className="flex flex-col items-center animate-slide-up">
                 <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6">
                   <XCircle size={40} className="text-red-400" />
                 </div>
                 <h1 className="font-serif text-3xl md:text-4xl text-gray-900 mb-3">Payment Failed</h1>
-                <p className="font-sans text-gray-500 mb-8 text-sm leading-relaxed">
-                  We couldn't process your payment. Any items reserved for you have been returned to stock.
+                <p className="font-sans text-gray-500 mb-6 text-sm leading-relaxed">
+                  We couldn't process your payment. If you were charged, please check the status below.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+
+                {checkFeedback && (
+                  <div className="w-full bg-gray-50 border border-gray-200 text-gray-700 text-xs p-3 rounded mb-4 animate-fade-in">
+                    {checkFeedback}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3 w-full justify-center">
                   <button 
-                    onClick={() => navigate('/checkout')}
-                    className="bg-gray-900 text-white px-8 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:bg-brand-flamingo transition-colors rounded-full shadow-sm"
+                    onClick={handleManualRecheck}
+                    disabled={isManualChecking}
+                    className="w-full bg-brand-flamingo text-white py-3 font-sans uppercase tracking-[0.15em] text-[10px] font-bold hover:bg-brand-gold transition-colors rounded-full flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                   >
-                    Try Again
+                    {isManualChecking ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    {isManualChecking ? 'Verifying with Bank...' : 'Check Payment Status with CHIP'}
                   </button>
-                  <button 
-                    onClick={() => navigate('/')}
-                    className="text-gray-500 px-6 py-3.5 font-sans uppercase tracking-[0.2em] text-[10px] font-bold hover:text-gray-900 transition-colors"
-                  >
-                    Return Home
-                  </button>
+                  <div className="flex gap-2 w-full">
+                    <button 
+                      onClick={() => navigate('/checkout')}
+                      className="flex-1 bg-gray-900 text-white py-2.5 font-sans uppercase tracking-[0.15em] text-[10px] font-bold hover:bg-brand-flamingo transition-colors rounded-full shadow-sm"
+                    >
+                      Try Again
+                    </button>
+                    <button 
+                      onClick={() => navigate('/')}
+                      className="flex-1 text-gray-500 py-2.5 font-sans uppercase tracking-[0.15em] text-[10px] font-bold hover:text-gray-900 transition-colors"
+                    >
+                      Return Home
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

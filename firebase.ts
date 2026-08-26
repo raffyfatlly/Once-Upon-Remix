@@ -256,19 +256,76 @@ export const restoreStockForOrder = async (orderId: string, newStatus: 'cancelle
   });
 };
 
-// ⚠️ NEW: Logic for Admin to update status and handle stock automatically
+/**
+ * RE-DEDUCT STOCK FUNCTION (Used when rescuing a cancelled/failed order to paid)
+ */
+export const reDeductStockForOrder = async (orderId: string, newStatus: string = 'paid') => {
+  if (!db) throw new Error("Database not connected.");
+  const orderRef = doc(db, 'orders', orderId);
+
+  await runTransaction(db, async (transaction) => {
+    const orderDoc = await transaction.get(orderRef);
+    if (!orderDoc.exists()) {
+      throw new Error("Order not found");
+    }
+
+    const orderData = orderDoc.data() as Order;
+
+    // Deduct stock for all items
+    if (orderData.items && Array.isArray(orderData.items)) {
+      const productReads = orderData.items.map(item => {
+        let docId = item.baseProductId || item.id;
+        if (typeof docId === 'string' && docId.endsWith('-protected')) {
+          docId = docId.replace(/-protected$/, '');
+        }
+        const ref = doc(db, 'products', docId);
+        return { ref, qty: item.quantity };
+      });
+
+      const productDocs = await Promise.all(productReads.map(p => transaction.get(p.ref)));
+
+      productDocs.forEach((docSnapshot, index) => {
+        if (docSnapshot.exists()) {
+          const currentData = docSnapshot.data();
+          const currentStock = currentData.stock || 0;
+          const qtyToDeduct = productReads[index].qty;
+          transaction.update(productReads[index].ref, {
+            stock: Math.max(0, currentStock - qtyToDeduct)
+          });
+        }
+      });
+    }
+
+    transaction.update(orderRef, {
+      status: newStatus,
+      updatedAt: new Date().toISOString(),
+      statusHistory: arrayUnion({
+        status: newStatus,
+        timestamp: new Date().toISOString(),
+        source: 'stock_rededucted_rescue'
+      })
+    });
+  });
+};
+
+// Logic for Admin to update status and handle stock automatically
 export const updateOrderAndRestock = async (orderId: string, newStatus: string, currentStatus: string) => {
   if (!db) throw new Error("Database not connected.");
 
-  // If we are cancelling or failing an order, we must return stock
-  if ((newStatus === 'cancelled' || newStatus === 'failed') && 
+  // If moving FROM cancelled/failed TO paid/packed/shipped/delivered/pending, re-deduct stock
+  if ((currentStatus === 'cancelled' || currentStatus === 'failed') && 
+      ['paid', 'packed', 'shipped', 'delivered', 'pending'].includes(newStatus)) {
+    await reDeductStockForOrder(orderId, newStatus);
+  } 
+  // If moving TO cancelled/failed from active, return stock
+  else if ((newStatus === 'cancelled' || newStatus === 'failed') && 
       (currentStatus !== 'cancelled' && currentStatus !== 'failed')) {
-        await restoreStockForOrder(orderId, newStatus as 'cancelled' | 'failed');
+    await restoreStockForOrder(orderId, newStatus as 'cancelled' | 'failed');
   } else {
-    // For other status changes (Pending -> Paid, Shipped, etc), stock is already deducted.
-    // Just update the status text.
+    // Regular status update (e.g. Paid -> Packed -> Shipped)
     await updateDoc(doc(db, 'orders', orderId), { 
       status: newStatus,
+      updatedAt: new Date().toISOString(),
       statusHistory: arrayUnion({ status: newStatus, timestamp: new Date().toISOString() })
     });
   }
@@ -298,11 +355,13 @@ export const autoReleaseStaleOrders = async (timeoutMinutes: number = 60): Promi
     if (diffMinutes > timeoutMinutes) {
       // 🛡️ CRITICAL CHECK: Before cancelling, check CHIP Gateway API to ensure it wasn't paid!
       let isActuallyPaid = false;
+      let verifySucceeded = false;
       try {
         if (typeof window !== 'undefined' || typeof fetch !== 'undefined') {
           const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(order.id)}`);
           if (verifyResp.ok) {
             const verifyData = await verifyResp.json();
+            verifySucceeded = true;
             if (verifyData && verifyData.paid === true) {
               isActuallyPaid = true;
               console.log(`[AutoRelease] Order #${order.id} was confirmed PAID on CHIP! Protected from cancellation.`);
@@ -313,8 +372,14 @@ export const autoReleaseStaleOrders = async (timeoutMinutes: number = 60): Promi
         console.warn(`[AutoRelease] Could not verify order #${order.id} against CHIP:`, verifyErr);
       }
 
-      if (!isActuallyPaid) {
-        console.log(`Order ${order.id} is stale (${Math.round(diffMinutes)} mins) and unconfirmed. Releasing stock...`);
+      // If it is paid, never cancel
+      if (isActuallyPaid) {
+        return;
+      }
+
+      // Only release if verify succeeded and confirmed unpaid, OR if it's extremely stale (> 120 mins)
+      if (verifySucceeded || diffMinutes > 120) {
+        console.log(`Order ${order.id} is stale (${Math.round(diffMinutes)} mins) and confirmed unpaid. Releasing stock...`);
         try {
           await restoreStockForOrder(order.id, 'cancelled');
           releaseCount++;

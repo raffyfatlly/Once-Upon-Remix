@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SiteConfig } from '../../types';
-import { Upload, Loader2, Database, AlertTriangle, Check } from 'lucide-react';
+import { Upload, Loader2, Database, AlertTriangle, Check, CreditCard, Copy, Globe } from 'lucide-react';
 import { resetOrderSystem, uploadImage } from '../../firebase';
 
 interface SettingsManagerProps {
@@ -16,6 +16,30 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ siteConfig, on
   const [testMessage, setTestMessage] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [installUsed, setInstallUsed] = useState(false);
+  const [copiedProdWebhook, setCopiedProdWebhook] = useState(false);
+  const [chipStatus, setChipStatus] = useState<any>(null);
+  const [isCheckingChip, setIsCheckingChip] = useState(false);
+
+  const prodWebhookUrl = 'https://onceuponmy.com/api/chip/webhook';
+
+  const handleCopyProdWebhook = () => {
+    navigator.clipboard.writeText(prodWebhookUrl);
+    setCopiedProdWebhook(true);
+    setTimeout(() => setCopiedProdWebhook(false), 3000);
+  };
+
+  const handleCheckChip = async () => {
+    setIsCheckingChip(true);
+    try {
+      const res = await fetch('/api/chip/status');
+      const data = await res.json();
+      setChipStatus(data);
+    } catch (e: any) {
+      setChipStatus({ configured: false, error: e.message });
+    } finally {
+      setIsCheckingChip(false);
+    }
+  };
 
   const handleConnectionTest = async () => {
     setIsTesting(true);
@@ -59,6 +83,59 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ siteConfig, on
   return (
     <div className="max-w-2xl mx-auto animate-fade-in space-y-8">
         
+        {/* CHIP Payment Gateway & Webhook Info */}
+        <div className="bg-white p-6 border border-brand-latte/20 rounded-[2px] shadow-sm space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="font-serif text-xl text-gray-900 flex items-center gap-2">
+                    <CreditCard size={20} className="text-brand-flamingo" /> CHIP Payment Gateway & Webhook
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">Configure your server webhook URL in CHIP Portal (<a href="https://gate.chip-in.asia" target="_blank" rel="noreferrer" className="underline font-bold text-brand-flamingo">gate.chip-in.asia</a>)</p>
+              </div>
+              <button 
+                onClick={handleCheckChip}
+                disabled={isCheckingChip}
+                className="bg-brand-grey/10 hover:bg-brand-flamingo hover:text-white text-gray-700 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] transition-colors flex items-center gap-1.5"
+              >
+                {isCheckingChip ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+                {isCheckingChip ? 'Checking...' : 'Check Status'}
+              </button>
+            </div>
+
+            {chipStatus && (
+              <div className={`text-xs p-3 rounded-[2px] border ${chipStatus.configured ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                {chipStatus.configured ? (
+                  <p className="font-bold flex items-center gap-1.5">
+                    <Check size={14} className="text-green-600" /> CHIP Gateway is active & configured (Brand ID: {chipStatus.brandIdPreview})
+                  </p>
+                ) : (
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="text-amber-600" /> CHIP Gateway keys not detected. Check Settings &gt; Secrets.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-emerald-900">
+                Production Webhook URL (For CHIP Portal)
+              </label>
+              <div className="flex items-center gap-2 bg-emerald-50/50 p-2.5 rounded-[2px] border border-emerald-200 font-mono text-xs text-emerald-950 break-all select-all">
+                <span className="flex-1 font-bold">{prodWebhookUrl}</span>
+                <button 
+                  onClick={handleCopyProdWebhook}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-[2px] flex items-center gap-1 shrink-0 transition-colors shadow-xs"
+                >
+                  {copiedProdWebhook ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedProdWebhook ? 'Copied' : 'Copy URL'}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-500">
+                Paste this into <strong>gate.chip-in.asia &rarr; Developers &rarr; Webhooks</strong> and subscribe to <code>purchase.paid</code>.
+              </p>
+            </div>
+        </div>
+
         {/* Diagnostics */}
         <div className="bg-white p-6 border border-brand-latte/20 rounded-[2px] shadow-sm">
             <h3 className="font-serif text-xl text-gray-900 mb-4 flex items-center gap-2">

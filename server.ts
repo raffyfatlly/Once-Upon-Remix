@@ -12,6 +12,7 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // ---------------------------------------------------------------------------
   // CAKENIC CLEAN URL SERVER-SIDE REDIRECT HANDLER (/cakenic, /cakenic-event)
@@ -363,10 +364,12 @@ async function startServer() {
         status === 'settled' || 
         status === 'completed' || 
         status === 'success' ||
+        status === 'authorized' ||
         eventType === 'purchase.paid' || 
         eventType === 'payment.paid' ||
         eventType === 'purchase.settled' ||
         eventType === 'payment.success' ||
+        eventType === 'purchase.authorized' ||
         payload.is_paid === true ||
         rawBody.is_paid === true;
 
@@ -457,6 +460,28 @@ async function startServer() {
         }
 
         if (orderDocRef) {
+          // If order was mistakenly marked as cancelled or failed, re-deduct stock!
+          if (orderData && (orderData.status === 'cancelled' || orderData.status === 'failed') && Array.isArray(orderData.items)) {
+            for (const item of orderData.items) {
+              let docId = item.baseProductId || item.id;
+              if (typeof docId === 'string' && docId.endsWith('-protected')) {
+                docId = docId.replace(/-protected$/, '');
+              }
+              if (docId) {
+                try {
+                  const prodRef = doc(db, 'products', docId);
+                  const prodSnap = await getDoc(prodRef);
+                  if (prodSnap.exists()) {
+                    const currentStock = prodSnap.data().stock || 0;
+                    await updateDoc(prodRef, { stock: Math.max(0, currentStock - (item.quantity || 1)) });
+                  }
+                } catch (stockErr) {
+                  console.warn(`[CHIP Webhook] Could not re-deduct stock for product ${docId}:`, stockErr);
+                }
+              }
+            }
+          }
+
           await updateDoc(orderDocRef, {
             status: 'paid',
             chip_purchase_id: purchaseId || orderData?.chip_purchase_id || '',
@@ -556,7 +581,7 @@ async function startServer() {
     }
 
     // B. Fallback: Search CHIP Gateway by reference if purchase ID wasn't stored or not paid
-    if (!chipPurchase || (!chipPurchase.is_paid && chipPurchase.status !== 'paid' && chipPurchase.status !== 'cleared' && chipPurchase.status !== 'settled' && chipPurchase.status !== 'completed')) {
+    if (!chipPurchase || (!chipPurchase.is_paid && chipPurchase.status !== 'paid' && chipPurchase.status !== 'cleared' && chipPurchase.status !== 'settled' && chipPurchase.status !== 'completed' && chipPurchase.status !== 'authorized')) {
       try {
         // Query CHIP purchase list filtered by reference
         const searchRefs = [cleanOrderId, `#${cleanOrderId}`];
@@ -568,7 +593,7 @@ async function startServer() {
             const listData = await listResp.json();
             const results = Array.isArray(listData) ? listData : listData?.results || [];
             const paidMatch = results.find((p: any) => 
-              p.status === 'paid' || p.status === 'cleared' || p.status === 'settled' || p.status === 'completed' || p.is_paid === true
+              p.status === 'paid' || p.status === 'cleared' || p.status === 'settled' || p.status === 'completed' || p.status === 'authorized' || p.status === 'success' || p.is_paid === true
             );
             if (paidMatch) {
               chipPurchase = paidMatch;
@@ -589,10 +614,34 @@ async function startServer() {
       chipPurchase.status === 'settled' ||
       chipPurchase.status === 'completed' ||
       chipPurchase.status === 'success' ||
-      chipPurchase.is_paid === true
+      chipPurchase.status === 'authorized' ||
+      chipPurchase.is_paid === true ||
+      (typeof chipPurchase.payment?.status === 'string' && ['paid', 'success', 'cleared', 'settled', 'authorized'].includes(chipPurchase.payment.status.toLowerCase()))
     );
 
     if (isChipPaid) {
+      // If the order was previously cancelled or failed, re-deduct product stock!
+      if ((orderData.status === 'cancelled' || orderData.status === 'failed') && Array.isArray(orderData.items)) {
+        for (const item of orderData.items) {
+          let docId = item.baseProductId || item.id;
+          if (typeof docId === 'string' && docId.endsWith('-protected')) {
+            docId = docId.replace(/-protected$/, '');
+          }
+          if (docId) {
+            try {
+              const prodRef = doc(db, 'products', docId);
+              const prodSnap = await getDoc(prodRef);
+              if (prodSnap.exists()) {
+                const currentStock = prodSnap.data().stock || 0;
+                await updateDoc(prodRef, { stock: Math.max(0, currentStock - (item.quantity || 1)) });
+              }
+            } catch (stockErr) {
+              console.warn(`[CHIP Verify] Could not re-deduct stock for product ${docId}:`, stockErr);
+            }
+          }
+        }
+      }
+
       // RESCUE ORDER: Update to PAID in Firestore!
       await updateDoc(orderDocRef, {
         status: 'paid',
@@ -650,7 +699,7 @@ async function startServer() {
   });
 
   // ---------------------------------------------------------------------------
-  // BATCH SYNC: AUTO-VERIFY ALL PENDING ORDERS WITH CHIP GATEWAY
+  // BATCH SYNC: AUTO-VERIFY PENDING, FAILED & CANCELLED ORDERS WITH CHIP GATEWAY
   // ---------------------------------------------------------------------------
   app.all("/api/chip/sync-pending", async (req, res) => {
     try {
@@ -663,24 +712,38 @@ async function startServer() {
         return res.status(400).json({ error: "CHIP_API key not configured" });
       }
 
-      // Query recent pending orders in Firestore
-      const q = query(
+      // 1. Query pending orders
+      const pendingQ = query(
         collection(db, 'orders'),
         where('status', '==', 'pending'),
         limit(50)
       );
-      const snapshot = await getDocs(q);
+      
+      // 2. Query cancelled and failed orders (to rescue any mistakenly cancelled)
+      const cancelledQ = query(
+        collection(db, 'orders'),
+        where('status', 'in', ['cancelled', 'failed', 'pending_transfer']),
+        limit(50)
+      );
 
-      if (snapshot.empty) {
-        return res.json({ synced: 0, rescued: 0, message: "No pending orders to verify." });
+      const [pendingSnap, unconfirmedSnap] = await Promise.all([
+        getDocs(pendingQ),
+        getDocs(cancelledQ)
+      ]);
+
+      const allDocMap = new Map<string, any>();
+      pendingSnap.docs.forEach(d => allDocMap.set(d.id, d));
+      unconfirmedSnap.docs.forEach(d => allDocMap.set(d.id, d));
+
+      if (allDocMap.size === 0) {
+        return res.json({ synced: 0, rescued: 0, message: "No unconfirmed orders to verify." });
       }
 
       const rescuedOrders: string[] = [];
       let checkedCount = 0;
 
-      for (const docSnap of snapshot.docs) {
+      for (const [orderId] of allDocMap) {
         checkedCount++;
-        const orderId = docSnap.id;
         try {
           const resObj = await verifyAndRescueSingleOrder(orderId, apiKey);
           if (resObj.paid && resObj.rescued) {
@@ -691,19 +754,19 @@ async function startServer() {
         }
       }
 
-      console.log(`[CHIP Sync Batch] Checked ${checkedCount} pending orders, rescued ${rescuedOrders.length} to PAID:`, rescuedOrders);
+      console.log(`[CHIP Sync Batch] Checked ${checkedCount} unconfirmed orders, rescued ${rescuedOrders.length} to PAID:`, rescuedOrders);
 
       return res.json({
         synced: checkedCount,
         rescued: rescuedOrders.length,
         rescuedOrderIds: rescuedOrders,
         message: rescuedOrders.length > 0 
-          ? `Successfully synced with CHIP: ${rescuedOrders.length} order(s) updated to Paid!`
-          : `Synced ${checkedCount} pending orders with CHIP. All pending statuses are up to date.`
+          ? `Successfully synced with CHIP: Rescued ${rescuedOrders.length} order(s) to Paid!`
+          : `Synced ${checkedCount} order(s) with CHIP. All statuses are up to date.`
       });
     } catch (err: any) {
       console.error("[CHIP Sync Batch] Error:", err);
-      return res.status(500).json({ error: err.message || "Failed to batch sync pending orders" });
+      return res.status(500).json({ error: err.message || "Failed to batch sync orders" });
     }
   });
 
