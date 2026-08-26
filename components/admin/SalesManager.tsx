@@ -29,6 +29,21 @@ const formatKLTime = (dateString: string) => {
   });
 };
 
+export const isSingaporeAddress = (shippingAddress?: string, adminNotes?: string): boolean => {
+  if (!shippingAddress && !adminNotes) return false;
+  const addr = (shippingAddress || '').toLowerCase();
+  const notes = (adminNotes || '').toLowerCase();
+  if (addr.includes('singapore')) return true;
+  if (/\b(singapore|sg)\b/i.test(addr)) return true;
+  if (notes.includes('singapore') || notes.includes('region: sg') || notes.includes('country: singapore')) return true;
+  return false;
+};
+
+export const isSingaporeOrder = (order: { shippingAddress?: string; adminNotes?: string } | null | undefined): boolean => {
+  if (!order) return false;
+  return isSingaporeAddress(order.shippingAddress, order.adminNotes);
+};
+
 export const getOrderChannel = (order: Order): 'pos' | 'cakenic' | 'online' => {
   if (
     order.source === 'cakenic' || 
@@ -616,7 +631,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     orders.forEach(order => {
       const key = (order.customerEmail || order.customerName || 'anonymous').toLowerCase().trim();
       const orderSource = getOrderChannel(order);
-      const orderCountry = (order.shippingAddress && order.shippingAddress.toLowerCase().includes('singapore')) ? 'singapore' : 'malaysia';
+      const orderCountry = isSingaporeOrder(order) ? 'singapore' : 'malaysia';
       
       const existing = customerMap.get(key);
       if (existing) {
@@ -1413,7 +1428,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       (filterSource === 'online' && orderChannel === 'online') ||
       (filterSource === 'cakenic' && orderChannel === 'cakenic');
 
-    const isSingapore = order.shippingAddress ? order.shippingAddress.toLowerCase().includes('singapore') : false;
+    const isSingapore = isSingaporeOrder(order);
     const matchesCountry = filterCountry === 'all' || 
       (filterCountry === 'singapore' && isSingapore) || 
       (filterCountry === 'malaysia' && !isSingapore);
@@ -1754,8 +1769,8 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
               <div className="relative">
                 <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} className="appearance-none bg-white border border-brand-latte/30 px-4 py-3 pr-10 rounded-[2px] text-xs font-bold uppercase tracking-widest focus:outline-none focus:border-brand-flamingo text-gray-600 w-full lg:w-44">
                     <option value="all">All Countries</option>
-                    <option value="malaysia">Malaysia</option>
-                    <option value="singapore">Singapore</option>
+                    <option value="malaysia">🇲🇾 Malaysia</option>
+                    <option value="singapore">🇸🇬 Singapore</option>
                 </select>
                 <Globe size={14} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
@@ -1899,6 +1914,14 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                         <td className="p-4">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <div className="font-mono text-xs text-gray-400 font-bold" title={order.id}>{order.id.length > 8 ? `#${order.id.substring(0,6)}...` : `#${order.id}`}</div>
+                                {isSingaporeOrder(order) && (
+                                    <span 
+                                        className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded shadow-2xs animate-fade-in"
+                                        title="Singapore Overseas Order"
+                                    >
+                                        <span className="text-[11px] leading-none">🇸🇬</span> SG
+                                    </span>
+                                )}
                                 {hasManualNote(order) && (
                                     <span 
                                         className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded animate-pulse shadow-sm"
@@ -1911,15 +1934,22 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                             <div className="flex flex-col mt-1.5 gap-0.5">
                                 <div className="flex items-center gap-1.5 text-xs text-gray-500" title="Order Date"><Calendar size={12} /> {formatKLDate(order.date)}</div>
                                 <div className="flex items-center gap-1.5 text-xs text-gray-400" title="Order Time"><Clock size={12} /> {formatKLTime(order.date)}</div>
-                                {getOrderChannel(order) === 'pos' && (
-                                  <div className="mt-1 bg-amber-50 text-amber-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-amber-200">POS Sales</div>
-                                )}
-                                {getOrderChannel(order) === 'cakenic' && (
-                                  <div className="mt-1 bg-rose-100 text-rose-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-rose-300">Cakenic Sales</div>
-                                )}
-                                {getOrderChannel(order) === 'online' && (
-                                  <div className="mt-1 bg-blue-50 text-blue-700 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-blue-200">Online Sales</div>
-                                )}
+                                <div className="flex items-center gap-1 flex-wrap mt-1">
+                                  {getOrderChannel(order) === 'pos' && (
+                                    <div className="bg-amber-50 text-amber-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-amber-200">POS Sales</div>
+                                  )}
+                                  {getOrderChannel(order) === 'cakenic' && (
+                                    <div className="bg-rose-100 text-rose-800 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-rose-300">Cakenic Sales</div>
+                                  )}
+                                  {getOrderChannel(order) === 'online' && (
+                                    <div className="bg-blue-50 text-blue-700 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-blue-200">Online Sales</div>
+                                  )}
+                                  {isSingaporeOrder(order) && (
+                                    <div className="bg-red-50 text-red-700 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded w-fit tracking-widest border border-red-200 flex items-center gap-1">
+                                      <span>🇸🇬</span> SG Order
+                                    </div>
+                                  )}
+                                </div>
                                 {shippedDateStr && (
                                   <div className="mt-1.5 pt-1.5 border-t border-dashed border-brand-latte/20">
                                     <div className="text-[9px] uppercase tracking-widest font-bold text-blue-600">Shipped At:</div>
@@ -1935,7 +1965,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                 </div>
                             )}
                         </td>
-                        <td className="p-4"><div className="flex items-start gap-2"><div className="bg-brand-latte/20 p-1.5 rounded-full mt-0.5"><User size={12} className="text-brand-latte" /></div><div><div className="font-serif text-gray-900">{order.customerName}</div><div className="text-xs text-gray-400">{order.customerEmail}</div>{order.customerPhone && (<div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5"><Phone size={10} /> {order.customerPhone}</div>)}</div></div></td>
+                        <td className="p-4"><div className="flex items-start gap-2"><div className="bg-brand-latte/20 p-1.5 rounded-full mt-0.5"><User size={12} className="text-brand-latte" /></div><div><div className="flex items-center gap-1.5 flex-wrap"><div className="font-serif text-gray-900">{order.customerName}</div>{isSingaporeOrder(order) && (<span className="text-[8px] font-bold uppercase tracking-wider text-red-700 bg-red-50 border border-red-200 px-1 py-0.2 rounded inline-flex items-center gap-0.5">🇸🇬 SG</span>)}</div><div className="text-xs text-gray-400">{order.customerEmail}</div>{order.customerPhone && (<div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5"><Phone size={10} /> {order.customerPhone}</div>)}</div></div></td>
                         <td className="p-4">
                             <div className="text-xs text-gray-600">
                                 {order.items.map(i => {
@@ -2158,8 +2188,13 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                 <div className="w-full md:w-1/3 space-y-6">
                                     {/* Shipping */}
                                     <div>
-                                    <h4 className="font-serif text-sm font-bold uppercase tracking-widest text-gray-900 mb-2 flex items-center gap-2">
-                                        <MapPin size={14} /> Shipping Details
+                                    <h4 className="font-serif text-sm font-bold uppercase tracking-widest text-gray-900 mb-2 flex items-center justify-between">
+                                        <span className="flex items-center gap-2"><MapPin size={14} /> Shipping Details</span>
+                                        {isSingaporeOrder(order) && (
+                                          <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded">
+                                            <span>🇸🇬</span> Singapore Delivery
+                                          </span>
+                                        )}
                                     </h4>
                                     <div className="bg-white p-4 rounded-[2px] border border-brand-latte/20 text-sm text-gray-600 leading-relaxed">
                                         <p className="font-bold text-gray-900 mb-1">{order.customerName}</p>
@@ -2393,8 +2428,13 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                   </span>
                                 ))}
                                 {Array.from(cust.countries).map(c => (
-                                  <span key={c} className="px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider bg-sky-50 text-sky-700 border border-sky-200 rounded">
-                                    {c}
+                                  <span key={c} className={`px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded border inline-flex items-center gap-1 ${
+                                    c === 'singapore' 
+                                      ? 'bg-red-50 text-red-700 border-red-200 font-bold' 
+                                      : 'bg-sky-50 text-sky-700 border-sky-200'
+                                  }`}>
+                                    <span>{c === 'singapore' ? '🇸🇬' : '🇲🇾'}</span>
+                                    {c === 'singapore' ? 'Singapore' : 'Malaysia'}
                                   </span>
                                 ))}
                               </div>
@@ -2439,6 +2479,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
                                           <div className="flex items-center gap-2 flex-wrap pl-1">
                                             <span className="font-mono text-xs font-bold text-gray-900">#{histOrder.id.substring(0, 8).toUpperCase()}</span>
+                                            {isSingaporeOrder(histOrder) && (
+                                              <span className="text-[9px] font-bold uppercase bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                                <span>🇸🇬</span> SG
+                                              </span>
+                                            )}
                                             <span className="text-[9px] font-bold uppercase bg-brand-grey/10 text-gray-500 px-1.5 py-0.5 rounded border border-gray-200">
                                               {histOrder.source || 'online'}
                                             </span>

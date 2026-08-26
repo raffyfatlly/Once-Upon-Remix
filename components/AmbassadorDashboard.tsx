@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Ambassador, Order, Product } from '../types';
 import { db, saveTrackedLinkInDb, updateAmbassadorInDb } from '../firebase';
+import { isSingaporeOrder } from './admin/SalesManager';
 import { collection, query, getDocs } from 'firebase/firestore';
 
 interface AmbassadorDashboardProps {
@@ -658,6 +659,12 @@ export const AmbassadorDashboard: React.FC<AmbassadorDashboardProps> = ({
                               Referred Sale #{order.id}
                             </span>
                             
+                            {isSingaporeOrder(order) && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200 inline-flex items-center gap-1">
+                                <span>🇸🇬</span> SG
+                              </span>
+                            )}
+
                             {/* Confirmation Status Pill */}
                             {order.isConfirmed ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">

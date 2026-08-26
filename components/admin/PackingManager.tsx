@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { Order } from '../../types';
-import { ClipboardCopy, Package, Search, CheckSquare, Square, Truck, Check, X, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { ClipboardCopy, Package, Search, CheckSquare, Square, Truck, Check, X, ArrowRight, AlertCircle, Loader2, Globe } from 'lucide-react';
 import { updateOrderAndRestock, updateOrderInDb, getOrderById } from '../../firebase';
+import { isSingaporeOrder } from './SalesManager';
 
 interface PackingManagerProps {
   orders: Order[];
@@ -75,13 +76,14 @@ export const PackingManager: React.FC<PackingManagerProps> = ({ orders }) => {
     // Address:
     // Items:
     const text = selected.map(order => {
+      const isSG = isSingaporeOrder(order);
       const itemsToPack = order.items.filter(i => i.isPickedUp !== true);
       const itemsList = itemsToPack.length > 0
         ? itemsToPack.map(i => `${i.name} (x${i.quantity})`).join(', ')
         : 'None - All items collected in-store';
 
       return `
-Order No: ${order.id}
+Order No: ${order.id}${isSG ? ' [🇸🇬 SINGAPORE]' : ''}
 Name: ${order.customerName}
 Phone: ${order.customerPhone}
 Address: ${order.shippingAddress}
@@ -422,13 +424,27 @@ Items: ${itemsList}
                            </button>
                          </td>
                          <td className="p-4 align-top">
-                           <span className="font-mono text-xs font-bold text-gray-900 bg-brand-grey/10 px-2 py-1 rounded">#{order.id}</span>
+                           <div className="flex items-center gap-1.5 flex-wrap">
+                             <span className="font-mono text-xs font-bold text-gray-900 bg-brand-grey/10 px-2 py-1 rounded">#{order.id}</span>
+                             {isSingaporeOrder(order) && (
+                               <span className="inline-flex items-center gap-1 bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded shadow-2xs" title="Singapore Order (Overseas Delivery)">
+                                 <span className="text-[11px] leading-none">🇸🇬</span> SG
+                               </span>
+                             )}
+                           </div>
                          </td>
                          <td className="p-4 align-top">
                            <div className="flex items-start gap-3">
                                <div className="mt-0.5 text-gray-400"><Truck size={14} /></div>
                                <div>
-                                   <div className="text-sm font-bold text-gray-900 mb-1">{order.customerName}</div>
+                                   <div className="flex items-center gap-2 flex-wrap mb-1">
+                                     <span className="text-sm font-bold text-gray-900">{order.customerName}</span>
+                                     {isSingaporeOrder(order) && (
+                                       <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded inline-flex items-center gap-1">
+                                         <span>🇸🇬</span> Singapore Order
+                                       </span>
+                                     )}
+                                   </div>
                                     {/* Items checklist */}
                                     <div className="mt-3.5 mb-2 pt-3 border-t border-brand-latte/10">
                                       <div className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Items in this Order:</div>
