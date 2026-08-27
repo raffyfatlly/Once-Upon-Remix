@@ -377,8 +377,8 @@ export const autoReleaseStaleOrders = async (timeoutMinutes: number = 60): Promi
         return;
       }
 
-      // Only release if verify succeeded and confirmed unpaid, OR if it's extremely stale (> 120 mins)
-      if (verifySucceeded || diffMinutes > 120) {
+      // Only release if verify explicitly succeeded and confirmed unpaid
+      if (verifySucceeded && !isActuallyPaid) {
         console.log(`Order ${order.id} is stale (${Math.round(diffMinutes)} mins) and confirmed unpaid. Releasing stock...`);
         try {
           await restoreStockForOrder(order.id, 'cancelled');

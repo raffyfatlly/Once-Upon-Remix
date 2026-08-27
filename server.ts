@@ -554,7 +554,7 @@ async function startServer() {
   // CHIP ORDER VERIFICATION & RESCUE HELPER
   // Actively verifies an order against the CHIP Gateway API and rescues it to PAID
   // ---------------------------------------------------------------------------
-  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{ paid: boolean; status: string; rescued?: boolean; order?: any; note?: string }> => {
+  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{ paid: boolean; status: string; rescued?: boolean; order?: any; note?: string; purchaseId?: string }> => {
     const cleanOrderId = (orderIdParam || '').replace(/^#/, '').trim();
     if (!cleanOrderId || !db) {
       return { paid: false, status: 'unknown', note: 'Missing order ID or DB' };
@@ -587,7 +587,7 @@ async function startServer() {
       return { paid: false, status: 'not_found', note: 'Order not found in database' };
     }
 
-    // If already paid/shipped/delivered, return success immediately
+    // If order is already in paid/packed/shipped/delivered, return success
     if (['paid', 'packed', 'shipped', 'delivered'].includes(orderData.status)) {
       return {
         paid: true,
@@ -605,63 +605,101 @@ async function startServer() {
       };
     }
 
-    let chipPurchase: any = null;
+    const checkIsPaidStatus = (p: any) => {
+      if (!p) return false;
+      const st = (p.status || '').toString().toLowerCase();
+      const evt = (p.event_type || '').toString().toLowerCase();
+      const paySt = (p.payment?.status || '').toString().toLowerCase();
+      return (
+        st === 'paid' || st === 'cleared' || st === 'settled' || st === 'completed' || st === 'success' || st === 'authorized' ||
+        evt === 'purchase.paid' || evt === 'payment.paid' || evt === 'purchase.settled' || evt === 'purchase.authorized' ||
+        paySt === 'paid' || paySt === 'success' || paySt === 'cleared' || paySt === 'settled' || paySt === 'authorized' ||
+        p.is_paid === true
+      );
+    };
 
-    // A. Try checking by known purchase ID
+    const isMatchingOrderPurchase = (p: any) => {
+      if (!p) return false;
+      const pId = p.id ? String(p.id).trim() : '';
+      const knownChipId = orderData?.chip_purchase_id ? String(orderData.chip_purchase_id).trim() : '';
+      if (knownChipId && pId === knownChipId) return true;
+
+      const rawRef = (p.reference || p.client_reference || p.order_id || '').toString().trim();
+      const cleanPRef = rawRef.replace(/^#/, '').trim();
+      const targetClean = cleanOrderId.replace(/^#/, '').trim();
+
+      if (cleanPRef && cleanPRef === targetClean) return true;
+      if (cleanPRef && (cleanPRef === `ORDER-${targetClean}` || targetClean === `ORDER-${cleanPRef}`)) return true;
+
+      // Email + total fallback comparison
+      if (orderData?.customerEmail && p.client?.email) {
+        const pEmail = String(p.client.email).trim().toLowerCase();
+        const oEmail = String(orderData.customerEmail).trim().toLowerCase();
+        if (pEmail === oEmail && p.purchase?.products) {
+          const pTotalCents = (p.purchase.products || []).reduce((sum: number, item: any) => sum + (Number(item.price) * Number(item.quantity || 1)), 0);
+          const oTotalCents = Math.round((Number(orderData.total) || 0) * 100);
+          if (pTotalCents > 0 && Math.abs(pTotalCents - oTotalCents) <= 10) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
+
+    const candidatePurchases: any[] = [];
+
+    // A. Check by known purchase ID
     if (orderData.chip_purchase_id) {
       try {
         const resp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/${orderData.chip_purchase_id}/`, {
           headers: { "Authorization": `Bearer ${apiKey}` }
         });
         if (resp.ok) {
-          chipPurchase = await resp.json();
+          const pData = await resp.json();
+          candidatePurchases.push(pData);
         }
-      } catch (fetchErr) {
-        console.warn(`[CHIP Verify] Could not query purchase ${orderData.chip_purchase_id}:`, fetchErr);
+      } catch (err) {
+        console.warn(`[CHIP Verify] Could not query purchase ${orderData.chip_purchase_id}:`, err);
       }
     }
 
-    // B. Fallback: Search CHIP Gateway by reference if purchase ID wasn't stored or not paid
-    if (!chipPurchase || (!chipPurchase.is_paid && chipPurchase.status !== 'paid' && chipPurchase.status !== 'cleared' && chipPurchase.status !== 'settled' && chipPurchase.status !== 'completed' && chipPurchase.status !== 'authorized')) {
+    // B. Search CHIP Gateway by reference queries
+    const searchRefs = [cleanOrderId, `#${cleanOrderId}`, `ORDER-${cleanOrderId}`];
+    for (const refToSearch of searchRefs) {
       try {
-        // Query CHIP purchase list filtered by reference
-        const searchRefs = [cleanOrderId, `#${cleanOrderId}`];
-        for (const refToSearch of searchRefs) {
-          const listResp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/?reference=${encodeURIComponent(refToSearch)}`, {
-            headers: { "Authorization": `Bearer ${apiKey}` }
-          });
-          if (listResp.ok) {
-            const listData = await listResp.json();
-            const results = Array.isArray(listData) ? listData : listData?.results || [];
-            const paidMatch = results.find((p: any) => 
-              p.status === 'paid' || p.status === 'cleared' || p.status === 'settled' || p.status === 'completed' || p.status === 'authorized' || p.status === 'success' || p.is_paid === true
-            );
-            if (paidMatch) {
-              chipPurchase = paidMatch;
-              break;
-            } else if (results.length > 0 && !chipPurchase) {
-              chipPurchase = results[0];
-            }
-          }
+        const listResp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/?reference=${encodeURIComponent(refToSearch)}`, {
+          headers: { "Authorization": `Bearer ${apiKey}` }
+        });
+        if (listResp.ok) {
+          const listData = await listResp.json();
+          const items = Array.isArray(listData) ? listData : listData?.results || [];
+          items.forEach((item: any) => candidatePurchases.push(item));
         }
-      } catch (searchErr) {
-        console.warn(`[CHIP Verify] Could not search purchases by reference for #${cleanOrderId}:`, searchErr);
+      } catch (err) {
+        console.warn(`[CHIP Verify] Query reference ${refToSearch} failed:`, err);
       }
     }
 
-    const isChipPaid = chipPurchase && (
-      chipPurchase.status === 'paid' ||
-      chipPurchase.status === 'cleared' ||
-      chipPurchase.status === 'settled' ||
-      chipPurchase.status === 'completed' ||
-      chipPurchase.status === 'success' ||
-      chipPurchase.status === 'authorized' ||
-      chipPurchase.is_paid === true ||
-      (typeof chipPurchase.payment?.status === 'string' && ['paid', 'success', 'cleared', 'settled', 'authorized'].includes(chipPurchase.payment.status.toLowerCase()))
-    );
+    // C. Fallback: List recent purchases from CHIP to find matching order
+    try {
+      const listResp = await fetch(`https://gate.chip-in.asia/api/v1/purchases/`, {
+        headers: { "Authorization": `Bearer ${apiKey}` }
+      });
+      if (listResp.ok) {
+        const listData = await listResp.json();
+        const items = Array.isArray(listData) ? listData : listData?.results || [];
+        items.forEach((item: any) => candidatePurchases.push(item));
+      }
+    } catch (err) {
+      console.warn(`[CHIP Verify] List purchases fallback failed:`, err);
+    }
 
-    if (isChipPaid) {
-      // If the order was previously cancelled or failed, re-deduct product stock!
+    // Find paid matching purchase
+    const paidMatch = candidatePurchases.find(p => isMatchingOrderPurchase(p) && checkIsPaidStatus(p));
+
+    if (paidMatch) {
+      // Re-deduct product stock if order was previously cancelled or failed
       if ((orderData.status === 'cancelled' || orderData.status === 'failed') && Array.isArray(orderData.items)) {
         for (const item of orderData.items) {
           let docId = item.baseProductId || item.id;
@@ -683,13 +721,13 @@ async function startServer() {
         }
       }
 
-      // RESCUE ORDER: Update to PAID in Firestore!
+      // Update Firestore document to PAID
       await updateDoc(orderDocRef, {
         status: 'paid',
-        chip_purchase_id: chipPurchase.id || orderData.chip_purchase_id || '',
-        chip_payment_status: chipPurchase.status || 'paid',
+        chip_purchase_id: paidMatch.id || orderData.chip_purchase_id || '',
+        chip_payment_status: paidMatch.status || 'paid',
         chip_verified_at: new Date().toISOString(),
-        chip_paid_at: chipPurchase.transaction_data?.paid_at || chipPurchase.paid_at || new Date().toISOString(),
+        chip_paid_at: paidMatch.transaction_data?.paid_at || paidMatch.paid_at || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         statusHistory: arrayUnion({
           status: 'paid',
@@ -698,14 +736,15 @@ async function startServer() {
         })
       });
 
-      console.log(`[CHIP Verify] RESCUED Order #${cleanOrderId} from "${orderData.status}" to "PAID" via CHIP gateway verification!`);
+      console.log(`[CHIP Verify] RESCUED Order #${cleanOrderId} from "${orderData.status}" to "PAID" via CHIP purchase ID ${paidMatch.id}!`);
       orderData.status = 'paid';
 
       return {
         paid: true,
         status: 'paid',
         rescued: true,
-        order: orderData
+        order: orderData,
+        purchaseId: paidMatch.id
       };
     }
 
@@ -808,6 +847,79 @@ async function startServer() {
     } catch (err: any) {
       console.error("[CHIP Sync Batch] Error:", err);
       return res.status(500).json({ error: err.message || "Failed to batch sync orders" });
+    }
+  });
+
+  // Admin Manual Order Rescue Endpoint
+  app.all("/api/admin/force-paid/:orderId", async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(500).json({ error: "Database not connected" });
+      }
+      const cleanOrderId = (req.params.orderId || '').replace(/^#/, '').trim();
+      let orderDocRef = doc(db, 'orders', cleanOrderId);
+      let orderSnap = await getDoc(orderDocRef);
+      if (!orderSnap.exists()) {
+        const hashDoc = doc(db, 'orders', `#${cleanOrderId}`);
+        const hashSnap = await getDoc(hashDoc);
+        if (hashSnap.exists()) {
+          orderDocRef = hashDoc;
+          orderSnap = hashSnap;
+        } else {
+          const q = query(collection(db, 'orders'), where('id', '==', cleanOrderId), limit(1));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            orderDocRef = snap.docs[0].ref;
+            orderSnap = snap.docs[0] as any;
+          }
+        }
+      }
+
+      if (!orderSnap || !orderSnap.exists()) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const orderData: any = orderSnap.data();
+
+      // Re-deduct product stock if order was previously cancelled or failed
+      if ((orderData.status === 'cancelled' || orderData.status === 'failed') && Array.isArray(orderData.items)) {
+        for (const item of orderData.items) {
+          let docId = item.baseProductId || item.id;
+          if (typeof docId === 'string' && docId.endsWith('-protected')) {
+            docId = docId.replace(/-protected$/, '');
+          }
+          if (docId) {
+            try {
+              const prodRef = doc(db, 'products', docId);
+              const prodSnap = await getDoc(prodRef);
+              if (prodSnap.exists()) {
+                const currentStock = prodSnap.data().stock || 0;
+                await updateDoc(prodRef, { stock: Math.max(0, currentStock - (item.quantity || 1)) });
+              }
+            } catch (stockErr) {
+              console.warn(`[Force Paid] Could not re-deduct stock for product ${docId}:`, stockErr);
+            }
+          }
+        }
+      }
+
+      await updateDoc(orderDocRef, {
+        status: 'paid',
+        chip_payment_status: 'paid',
+        chip_verified_at: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        statusHistory: arrayUnion({
+          status: 'paid',
+          timestamp: new Date().toISOString(),
+          source: 'admin_manual_reconciliation_force_paid'
+        })
+      });
+
+      console.log(`[Admin] Force-updated Order #${cleanOrderId} to PAID.`);
+      return res.json({ success: true, message: `Order #${cleanOrderId} successfully updated to PAID!`, orderId: cleanOrderId });
+    } catch (err: any) {
+      console.error("[Force Paid] Error:", err);
+      return res.status(500).json({ error: err.message || "Failed to update order status" });
     }
   });
 
