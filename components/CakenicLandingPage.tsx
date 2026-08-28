@@ -8,7 +8,7 @@ import {
   CheckCircle2, Search, Mail, Phone, KeyRound
 } from 'lucide-react';
 import { CartItem, Product, Order } from '../types';
-import { createOrderInDb, searchCakenicOrder } from '../firebase';
+import { createOrderInDb, searchCakenicOrder, subscribeToProducts } from '../firebase';
 import { getAttribution } from '../analytics';
 import { CakenicTicketView } from './CakenicTicketView';
 
@@ -47,7 +47,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     price: 68,
     badge: 'Popular Location',
     image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
-    availableSlots: 0,
+    availableSlots: 27,
     description: 'Join us at Taman Botani Putrajaya for an elegant European Classical themed afternoon of cake sharing, picnic vibes, and sweet memories.'
   },
   {
@@ -63,7 +63,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     badge: 'Limited Spots',
     popular: true,
     image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
-    availableSlots: 0,
+    availableSlots: 30,
     description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden with a grand Rocco Garden theme, featuring curated gift bags, prizes, and a dream botanical picnic setting.'
   }
 ];
@@ -72,10 +72,79 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // Synchronously restore cached products so ticket stock renders instantly on first paint without delay
+  const [liveProducts, setLiveProducts] = useState<Product[]>(() => {
+    if (products && products.length > 0) return products;
+    try {
+      const cachedCakenic = localStorage.getItem('ou_cakenic_tickets_cache');
+      if (cachedCakenic) {
+        const parsed = JSON.parse(cachedCakenic);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      const cachedAll = localStorage.getItem('ou_products_cache');
+      if (cachedAll) {
+        const parsed = JSON.parse(cachedAll);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return products;
+  });
+
+  const [isStockLoaded, setIsStockLoaded] = useState<boolean>(() => {
+    return Boolean(
+      (products && products.length > 0) ||
+      localStorage.getItem('ou_cakenic_tickets_cache') ||
+      localStorage.getItem('ou_products_cache')
+    );
+  });
+
+  // Sync when parent products prop updates
+  useEffect(() => {
+    if (products && products.length > 0) {
+      setLiveProducts(products);
+      setIsStockLoaded(true);
+      try {
+        const cakenicProds = products.filter(p => 
+          p.id?.includes('cakenic') || 
+          p.collection === 'Cakenic Ticket' || 
+          p.collection === 'Cakenic 2026' ||
+          p.category === 'Event Ticket' || 
+          (p.name && p.name.toLowerCase().includes('cakenic'))
+        );
+        if (cakenicProds.length > 0) {
+          localStorage.setItem('ou_cakenic_tickets_cache', JSON.stringify(cakenicProds));
+        }
+      } catch (e) {}
+    }
+  }, [products]);
+
+  // Real-time direct subscription to Firestore products
+  useEffect(() => {
+    const unsubscribe = subscribeToProducts((fetchedProducts) => {
+      if (fetchedProducts && fetchedProducts.length > 0) {
+        setLiveProducts(fetchedProducts);
+        setIsStockLoaded(true);
+        try {
+          const cakenicProds = fetchedProducts.filter(p => 
+            p.id?.includes('cakenic') || 
+            p.collection === 'Cakenic Ticket' || 
+            p.collection === 'Cakenic 2026' ||
+            p.category === 'Event Ticket' || 
+            (p.name && p.name.toLowerCase().includes('cakenic'))
+          );
+          if (cakenicProds.length > 0) {
+            localStorage.setItem('ou_cakenic_tickets_cache', JSON.stringify(cakenicProds));
+          }
+        } catch (e) {}
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Dynamically map ticket prices and details from products in Admin
   const locations = React.useMemo(() => {
     return CAKENIC_LOCATIONS.map(loc => {
-      const matched = products.find(p => {
+      const matched = liveProducts.find(p => {
         if (p.id === loc.id) return true;
         const nameLower = (p.name || '').toLowerCase();
         if (loc.id.includes('putrajaya') && nameLower.includes('putrajaya')) return true;
@@ -83,16 +152,17 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
         return false;
       });
       if (matched) {
+        const rawStock = matched.stock !== undefined ? Number(matched.stock) : loc.availableSlots;
         return {
           ...loc,
           price: typeof matched.price === 'number' ? matched.price : loc.price,
-          availableSlots: matched.stock !== undefined ? Number(matched.stock) : loc.availableSlots,
+          availableSlots: Math.max(0, rawStock),
           description: matched.description || loc.description
         };
       }
       return loc;
     });
-  }, [products]);
+  }, [liveProducts]);
 
   // Selected Ticket & Checkout Drawer State
   const [selectedTicket, setSelectedTicket] = useState<CakenicLocationTicket | null>(null);
@@ -386,72 +456,75 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
           <div className="absolute -inset-4 bg-white/70 blur-2xl rounded-[40px] pointer-events-none -z-10" />
 
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 relative z-10">
-            {locations.map((loc) => (
-              <div
-                key={loc.id}
-                onClick={() => {
-                  if (loc.availableSlots > 0) {
-                    handleOpenCheckout(loc);
-                  }
-                }}
-                className="group bg-gradient-to-b from-[#FFFDFB] via-[#FBF5EE] to-[#F1E5DA] rounded-3xl p-3 sm:p-4 shadow-[inset_0_1.5px_0_0_rgba(255,255,255,0.95),inset_0_-3.5px_0_0_rgba(200,165,150,0.45),0_14px_32px_rgba(95,50,35,0.13)] hover:shadow-[inset_0_1.5px_0_0_rgba(255,255,255,1),inset_0_-4px_0_0_rgba(180,140,120,0.55),0_18px_40px_rgba(95,50,35,0.18)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col items-center justify-between text-center gap-2 sm:gap-2.5"
-              >
-                {/* 1. TOP ELEMENT: CUTE CLEAN DATE BADGE */}
-                <span className="bg-[#FAF0EC]/90 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8),inset_0_-1px_0_0_rgba(215,180,165,0.25)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <Calendar size={10} className="text-[#E3A099]" />
-                  <span>{loc.city === 'Putrajaya' ? '12 Sep 2026' : '24 Oct 2026'}</span>
-                </span>
-
-                {/* 2. CITY TITLE IN ALL CAPS & THEME */}
-                <div className="space-y-0.5">
-                  <h2 className="font-display font-extrabold text-base sm:text-xl text-[#2C1D1C] group-hover:text-[#8C5247] transition-colors tracking-[0.18em] leading-tight uppercase">
-                    {loc.city}
-                  </h2>
-                  <p className="font-serif italic text-[11px] sm:text-xs text-[#8C5247] font-medium tracking-wide">
-                    {loc.theme}
-                  </p>
-                </div>
-
-                {/* 3. PRICE TAG & REMAINING STOCK */}
-                <div className="flex flex-col items-center gap-1">
-                  <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
-                    RM {loc.price}
-                  </div>
-                  {loc.availableSlots <= 0 ? (
-                    <div className="bg-red-100 text-red-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-red-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                      <span>Sold Out</span>
-                    </div>
-                  ) : (
-                    <div className="bg-[#8C5247]/10 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-[#8C5247]/15">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse shrink-0" />
-                      <span>{loc.availableSlots} tickets left</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 4. BUTTON */}
-                <button 
-                  disabled={loc.availableSlots <= 0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (loc.availableSlots > 0) {
+            {locations.map((loc) => {
+              const isSoldOut = isStockLoaded && loc.availableSlots <= 0;
+              return (
+                <div
+                  key={loc.id}
+                  onClick={() => {
+                    if (!isSoldOut) {
                       handleOpenCheckout(loc);
                     }
                   }}
-                  className={`w-full py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-sans font-medium transition-all duration-300 flex items-center justify-center gap-1 ${
-                    loc.availableSlots <= 0
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
-                      : 'bg-[#E3A099] group-hover:bg-[#C5DDD8] group-hover:text-[#332524] text-white shadow-[0_3px_10px_rgba(227,160,153,0.35)]'
-                  }`}
+                  className="group bg-gradient-to-b from-[#FFFDFB] via-[#FBF5EE] to-[#F1E5DA] rounded-3xl p-3 sm:p-4 shadow-[inset_0_1.5px_0_0_rgba(255,255,255,0.95),inset_0_-3.5px_0_0_rgba(200,165,150,0.45),0_14px_32px_rgba(95,50,35,0.13)] hover:shadow-[inset_0_1.5px_0_0_rgba(255,255,255,1),inset_0_-4px_0_0_rgba(180,140,120,0.55),0_18px_40px_rgba(95,50,35,0.18)] hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col items-center justify-between text-center gap-2 sm:gap-2.5"
                 >
-                  <span>{loc.availableSlots <= 0 ? 'Sold Out' : 'Get Ticket'}</span>
-                  {loc.availableSlots > 0 && (
-                    <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
-                  )}
-                </button>
-              </div>
-            ))}
+                  {/* 1. TOP ELEMENT: CUTE CLEAN DATE BADGE */}
+                  <span className="bg-[#FAF0EC]/90 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8),inset_0_-1px_0_0_rgba(215,180,165,0.25)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Calendar size={10} className="text-[#E3A099]" />
+                    <span>{loc.city === 'Putrajaya' ? '12 Sep 2026' : '24 Oct 2026'}</span>
+                  </span>
+
+                  {/* 2. CITY TITLE IN ALL CAPS & THEME */}
+                  <div className="space-y-0.5">
+                    <h2 className="font-display font-extrabold text-base sm:text-xl text-[#2C1D1C] group-hover:text-[#8C5247] transition-colors tracking-[0.18em] leading-tight uppercase">
+                      {loc.city}
+                    </h2>
+                    <p className="font-serif italic text-[11px] sm:text-xs text-[#8C5247] font-medium tracking-wide">
+                      {loc.theme}
+                    </p>
+                  </div>
+
+                  {/* 3. PRICE TAG & REMAINING STOCK */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="font-sans text-xs sm:text-sm font-bold text-[#8C5247] tracking-tight">
+                      RM {loc.price}
+                    </div>
+                    {isSoldOut ? (
+                      <div className="bg-red-100 text-red-700 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-red-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                        <span>Sold Out</span>
+                      </div>
+                    ) : (
+                      <div className="bg-[#8C5247]/10 text-[#8C5247] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8)] text-[10px] sm:text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-full flex items-center gap-1.5 border border-[#8C5247]/15">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#E3A099] animate-pulse shrink-0" />
+                        <span>{loc.availableSlots} tickets left</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 4. BUTTON */}
+                  <button 
+                    disabled={isSoldOut}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isSoldOut) {
+                        handleOpenCheckout(loc);
+                      }
+                    }}
+                    className={`w-full py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-sans font-medium transition-all duration-300 flex items-center justify-center gap-1 ${
+                      isSoldOut
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed shadow-none'
+                        : 'bg-[#E3A099] group-hover:bg-[#C5DDD8] group-hover:text-[#332524] text-white shadow-[0_3px_10px_rgba(227,160,153,0.35)]'
+                    }`}
+                  >
+                    <span>{isSoldOut ? 'Sold Out' : 'Get Ticket'}</span>
+                    {!isSoldOut && (
+                      <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                    )}
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {/* --- MOBILE NAVIGATION ISLAND PLACED RIGHT UNDER THE TICKETS (NON-STICKY) --- */}
