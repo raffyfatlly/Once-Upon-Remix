@@ -419,11 +419,27 @@ export const subscribeToOrders = (callback: (orders: Order[]) => void) => {
   }
   try {
     const q = query(collection(db, 'orders'), orderBy('date', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
-      callback(orders);
-    });
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+        callback(orders);
+      },
+      (error) => {
+        console.warn("subscribeToOrders orderBy query error, falling back to simple collection query:", error);
+        const fallbackQ = query(collection(db, 'orders'));
+        return onSnapshot(fallbackQ, (snapshot) => {
+          const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Order[];
+          orders.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+          callback(orders);
+        }, (err) => {
+          console.error("subscribeToOrders fallback error:", err);
+          callback([]);
+        });
+      }
+    );
   } catch (e) {
+    console.error("subscribeToOrders setup error:", e);
     callback([]);
     return () => {};
   }

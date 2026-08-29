@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Order } from '../../types';
-import { WebAnalyticsView } from './WebAnalyticsView';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend
@@ -129,7 +128,6 @@ const getKLDateFromIso = (isoString: string) => {
 };
 
 export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) => {
-  const [analyticsTab, setAnalyticsTab] = useState<'sales' | 'traffic'>('sales');
   const [filterYear, setFilterYear] = useState<string>('All');
   const [filterMonth, setFilterMonth] = useState<string>('All');
   const [filterDay, setFilterDay] = useState<string>('All');
@@ -573,37 +571,12 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
     <div className="space-y-8 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-brand-latte/20 pb-4 gap-4">
         <div>
-          <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Analytics Overview</h2>
-          <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Track store and traffic performance</p>
-        </div>
-        
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setAnalyticsTab('sales')}
-            className={`px-4 py-2 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${analyticsTab === 'sales' ? 'border-brand-flamingo text-brand-flamingo' : 'border-transparent text-gray-400 hover:text-gray-900'}`}
-          >
-            Sales Analytics
-          </button>
-          <button 
-            onClick={() => setAnalyticsTab('traffic')}
-            className={`px-4 py-2 text-xs uppercase tracking-widest font-bold border-b-2 transition-all ${analyticsTab === 'traffic' ? 'border-brand-flamingo text-brand-flamingo' : 'border-transparent text-gray-400 hover:text-gray-900'}`}
-          >
-            Web Traffic & Funnel
-          </button>
+          <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Sales Analytics</h2>
+          <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Track store sales performance and trends</p>
         </div>
       </div>
 
-      {analyticsTab === 'traffic' ? (
-        <WebAnalyticsView orders={orders} />
-      ) : (
-        <div>
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <div>
-              <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Sales Overview</h2>
-              <p className="text-xs text-gray-400 uppercase tracking-widest mt-1">Track sales performance and trends</p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+      <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mb-6 justify-end">
               {/* Custom Multi-Product Comparison Dropdown */}
               <div ref={dropdownRef} className="relative flex-1 sm:flex-initial">
               <button
@@ -734,7 +707,6 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
               )}
             </div>
           </div>
-        </div>
 
         <div className="flex flex-col gap-4 mb-4">
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-white border border-brand-latte/20 p-2 rounded-[2px] self-start w-full md:w-auto overflow-x-auto">
@@ -1087,8 +1059,6 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
           </div>
         </div>
       </div>
-    )}
-    </div>
   );
 };
 

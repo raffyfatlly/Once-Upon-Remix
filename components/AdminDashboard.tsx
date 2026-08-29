@@ -8,8 +8,6 @@ import { PackingManager } from './admin/PackingManager';
 import { MumsClub } from './admin/MumsClub';
 import { SettingsManager } from './admin/SettingsManager';
 import { AnalyticsManager } from './admin/AnalyticsManager';
-import { LinkManager } from './admin/LinkManager';
-import { AmbassadorManager } from './admin/AmbassadorManager';
 
 import { POSSystem } from './admin/POSSystem';
 
@@ -37,7 +35,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminEmail = ''
 }) => {
   const isCashier = adminEmail === 'cashier@admin.com';
-  const [activeTab, setActiveTab] = useState<'products' | 'sales' | 'pos' | 'packing' | 'club' | 'analytics' | 'settings' | 'links' | 'ambassadors'>('pos');
+  const [activeTab, setActiveTab] = useState<'products' | 'sales' | 'pos' | 'packing' | 'club' | 'analytics' | 'settings'>('pos');
   const currentTab = isCashier ? 'pos' : activeTab;
 
   return (
@@ -100,18 +98,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Mum's Club
                 </button>
                 <button 
-                  onClick={() => setActiveTab('links')}
-                  className={`text-xs uppercase tracking-widest font-bold transition-colors whitespace-nowrap flex-shrink-0 ${activeTab === 'links' ? 'text-brand-flamingo' : 'text-gray-400'}`}
-                >
-                  Link Manager
-                </button>
-                <button 
-                  onClick={() => setActiveTab('ambassadors')}
-                  className={`text-xs uppercase tracking-widest font-bold transition-colors whitespace-nowrap flex-shrink-0 ${activeTab === 'ambassadors' ? 'text-brand-flamingo' : 'text-gray-400'}`}
-                >
-                  Ambassadors
-                </button>
-                <button 
                   onClick={() => setActiveTab('settings')}
                   className={`text-xs uppercase tracking-widest font-bold transition-colors whitespace-nowrap flex-shrink-0 ${activeTab === 'settings' ? 'text-brand-flamingo' : 'text-gray-400'}`}
                 >
@@ -133,8 +119,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {currentTab === 'analytics' && <AnalyticsManager orders={orders} />}
         {currentTab === 'packing' && <PackingManager orders={orders} />}
         {currentTab === 'club' && <MumsClub />}
-        {currentTab === 'links' && <LinkManager products={products} />}
-        {currentTab === 'ambassadors' && <AmbassadorManager orders={orders} />}
         {currentTab === 'settings' && <SettingsManager siteConfig={siteConfig} onUpdateSiteConfig={onUpdateSiteConfig} installPrompt={installPrompt} />}
       </div>
     </div>

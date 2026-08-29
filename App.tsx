@@ -480,7 +480,16 @@ const App: React.FC = () => {
     } catch (e) {}
     return PRODUCTS;
   });
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(() => {
+    try {
+      const cached = localStorage.getItem('ou_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   
   // PWA Install Prompt State
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -547,7 +556,14 @@ const App: React.FC = () => {
       }
     });
     const unsubscribeOrders = subscribeToOrders((fetchedOrders) => {
-      setOrders(fetchedOrders);
+      if (fetchedOrders) {
+        setOrders(fetchedOrders);
+        try {
+          if (fetchedOrders.length > 0) {
+            localStorage.setItem('ou_orders_cache', JSON.stringify(fetchedOrders));
+          }
+        } catch (e) {}
+      }
     });
     return () => {
       unsubscribeProducts();
