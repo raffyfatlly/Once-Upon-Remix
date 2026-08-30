@@ -32,7 +32,13 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({ siteConfig, on
     setIsCheckingChip(true);
     try {
       const res = await fetch('/api/chip/status');
-      const data = await res.json();
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error(text.startsWith('<') ? 'Server returned HTML instead of JSON. Ensure backend routes are active.' : text.substring(0, 80));
+      }
       setChipStatus(data);
     } catch (e: any) {
       setChipStatus({ configured: false, error: e.message });

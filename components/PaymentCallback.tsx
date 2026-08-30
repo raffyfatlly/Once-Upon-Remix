@@ -21,10 +21,13 @@ export const PaymentCallback: React.FC = () => {
     try {
       const verifyResp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
       if (verifyResp.ok) {
-        const verifyData = await verifyResp.json();
-        if (verifyData && verifyData.paid === true) {
-          return true;
-        }
+        const text = await verifyResp.text();
+        try {
+          const verifyData = JSON.parse(text);
+          if (verifyData && verifyData.paid === true) {
+            return true;
+          }
+        } catch (_) {}
       }
     } catch (verifyErr) {
       console.warn("[PaymentCallback] Live verify fetch failed:", verifyErr);

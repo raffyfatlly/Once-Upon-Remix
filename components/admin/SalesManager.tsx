@@ -529,7 +529,14 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     setChipSyncResult(null);
     try {
       const resp = await fetch('/api/chip/sync-pending');
-      const data = await resp.json();
+      const text = await resp.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error(text.startsWith('<') ? 'Server returned HTML instead of JSON. Please check backend server configuration.' : text.substring(0, 100));
+      }
+
       if (resp.ok) {
         if (data.rescued > 0) {
           setChipSyncResult(`✅ Rescued ${data.rescued} order(s) to PAID!`);
@@ -551,11 +558,18 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     setVerifyingOrderId(orderId);
     try {
       const resp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
-      const data = await resp.json();
+      const text = await resp.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        throw new Error(text.startsWith('<') ? 'Server returned HTML instead of JSON. Ensure backend routes are active.' : text.substring(0, 100));
+      }
+
       if (resp.ok && data.paid) {
-        alert(`Order #${orderId} is confirmed PAID on CHIP! Status has been updated.`);
+        alert(`✅ Order #${orderId} is confirmed PAID on CHIP!\nStatus has been automatically updated to PAID.`);
       } else if (resp.ok && !data.paid) {
-        alert(`Order #${orderId} is currently NOT marked as paid on CHIP (CHIP status: ${data.chip_status || 'unpaid'}).`);
+        alert(`ℹ️ Order #${orderId} is currently NOT marked as paid on CHIP (CHIP status: ${data.chip_status || data.status || 'unpaid'}).`);
       } else {
         alert(`Verification response: ${data.error || data.note || 'Could not verify'}`);
       }
