@@ -2,7 +2,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, where, getDocs, runTransaction, setDoc, getDoc, arrayUnion, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadString, StringFormat } from 'firebase/storage';
-import { Product, Order, SiteConfig, Subscriber, Ambassador } from './types';
+import type { Product, Order, SiteConfig, Subscriber, Ambassador } from './types.ts';
 
 // ------------------------------------------------------------------
 // CONFIGURATION

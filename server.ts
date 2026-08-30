@@ -3,7 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import nodemailer from "nodemailer";
-import { db } from "./firebase";
+import { db } from "./firebase.ts";
 import { collection, query, where, getDocs, limit, doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 
 export const DEFAULT_CHIP_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
