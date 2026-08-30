@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import nodemailer from "nodemailer";
 import { db } from "./firebase";
@@ -553,7 +552,19 @@ app.use(express.urlencoded({
   // CHIP ORDER VERIFICATION & RESCUE HELPER
   // Actively verifies an order against the CHIP Gateway API and rescues it to PAID
   // ---------------------------------------------------------------------------
-  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{ paid: boolean; status: string; rescued?: boolean; order?: any; note?: string; purchaseId?: string }> => {
+  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{
+    paid: boolean;
+    status: string;
+    rescued?: boolean;
+    order?: any;
+    note?: string;
+    purchaseId?: string;
+    chip_status?: string;
+    attempts_count?: number;
+    failure_reason?: string | null;
+    latest_attempt_id?: string | null;
+    message?: string;
+  }> => {
     const cleanOrderId = (orderIdParam || '').replace(/^#/, '').trim();
     if (!cleanOrderId || !db) {
       return { paid: false, status: 'unknown', note: 'Missing order ID or DB' };
@@ -744,14 +755,29 @@ app.use(express.urlencoded({
         status: 'paid',
         rescued: true,
         order: orderData,
-        purchaseId: paidMatch.id
+        purchaseId: paidMatch.id,
+        chip_status: paidMatch.status || 'paid',
+        message: `Order #${cleanOrderId} is verified and confirmed PAID on CHIP.`
       };
     }
+
+    const matchingPurchases = candidatePurchases.filter(p => isMatchingOrderPurchase(p));
+    const latestAttempt = matchingPurchases[0];
+    const chipStatus = latestAttempt ? (latestAttempt.status || latestAttempt.payment?.status || 'unpaid') : 'not_found';
+    const failureReason = latestAttempt?.transaction_data?.error_message || latestAttempt?.error_message || latestAttempt?.status_history?.[0]?.message || null;
+    const attemptsCount = matchingPurchases.length;
 
     return {
       paid: false,
       status: orderData.status,
-      order: orderData
+      chip_status: chipStatus,
+      attempts_count: attemptsCount,
+      failure_reason: failureReason,
+      latest_attempt_id: latestAttempt?.id || null,
+      order: orderData,
+      message: chipStatus === 'not_found'
+        ? `No checkout session found on CHIP for Order #${cleanOrderId}. Customer might have closed the browser before reaching the payment gateway.`
+        : `Found ${attemptsCount} attempt(s) on CHIP. Latest status is "${String(chipStatus).toUpperCase()}". Payment was declined by bank, aborted, or expired.`
     };
   };
 
@@ -1013,6 +1039,7 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

@@ -563,18 +563,51 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       try {
         data = JSON.parse(text);
       } catch (parseErr) {
-        throw new Error(text.startsWith('<') ? 'Server returned HTML instead of JSON. Ensure backend routes are active.' : text.substring(0, 100));
+        throw new Error(text.startsWith('<') ? 'Server error occurred during verification. Check backend connection.' : text.substring(0, 100));
       }
 
       if (resp.ok && data.paid) {
-        alert(`✅ Order #${orderId} is confirmed PAID on CHIP!\nStatus has been automatically updated to PAID.`);
+        alert(`✅ Order #${orderId} is confirmed PAID on CHIP!\n\n• Status: PAID\n• Purchase ID: ${data.purchaseId || 'Confirmed'}\n\nThe order status in the dashboard has been updated.`);
       } else if (resp.ok && !data.paid) {
-        alert(`ℹ️ Order #${orderId} is currently NOT marked as paid on CHIP (CHIP status: ${data.chip_status || data.status || 'unpaid'}).`);
+        const rawStatus = (data.chip_status || data.status || 'unpaid').toLowerCase();
+        const attempts = data.attempts_count || 1;
+
+        if (rawStatus === 'error' || rawStatus === 'failed') {
+          alert(
+            `⚠️ Order #${orderId} - Payment Error on CHIP\n\n` +
+            `• CHIP Status: ERROR / FAILED\n` +
+            `• Attempts on CHIP: ${attempts}\n` +
+            `• Reason: Customer initiated checkout, but the payment was rejected by their bank (e.g. OTP failure/insufficient funds) or the session failed.\n\n` +
+            `💡 What to do:\n` +
+            `- Leave as "Pending": The system will automatically cancel and restock it in 60 minutes.\n` +
+            `- Or switch status to "Cancelled" right away if the customer will not retry.`
+          );
+        } else if (rawStatus === 'cancelled' || rawStatus === 'expired') {
+          alert(
+            `❌ Order #${orderId} - Cancelled / Expired on CHIP\n\n` +
+            `• CHIP Status: ${rawStatus.toUpperCase()}\n` +
+            `• Reason: The customer aborted the payment or the bank payment window timed out.\n\n` +
+            `💡 You can change the order status to "Cancelled" to immediately restore inventory.`
+          );
+        } else if (rawStatus === 'not_found') {
+          alert(
+            `ℹ️ Order #${orderId} - No Session on CHIP\n\n` +
+            `• CHIP Status: Not Found\n` +
+            `• Reason: The customer placed the order but did not complete opening or connecting to the CHIP payment gateway.\n\n` +
+            `💡 If unpaid, you can leave it to auto-expire or cancel it manually.`
+          );
+        } else {
+          alert(
+            `⏳ Order #${orderId} - Unpaid on CHIP\n\n` +
+            `• CHIP Status: ${rawStatus.toUpperCase()}\n` +
+            `• Message: ${data.message || 'Payment has not been completed yet.'}`
+          );
+        }
       } else {
-        alert(`Verification response: ${data.error || data.note || 'Could not verify'}`);
+        alert(`Verification response for Order #${orderId}:\n${data?.error || data?.message || 'Could not verify status on CHIP.'}`);
       }
     } catch (err: any) {
-      alert(`Verification failed: ${err.message}`);
+      alert(`Verification failed for Order #${orderId}:\n${err.message}`);
     } finally {
       setVerifyingOrderId(null);
     }
