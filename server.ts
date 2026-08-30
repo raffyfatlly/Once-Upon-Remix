@@ -1033,29 +1033,33 @@ Format your response in Markdown with clear headings and bullet points.`;
 
 async function startServer() {
   // If running in Vercel serverless function environment, do not start local HTTP listener
-  if (process.env.VERCEL) {
+  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION) {
     return;
   }
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  try {
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*all', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  } catch (serverErr) {
+    console.error("[Server Init Error]:", serverErr);
+  }
 }
 
 startServer();

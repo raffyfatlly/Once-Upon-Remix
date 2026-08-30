@@ -640,25 +640,33 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
           });
         }
       } else {
+        const errMsg = String(data?.error || data?.message || '');
+        const isVercelInvocation = errMsg.includes('FUNCTION_INVOCATION_FAILED') || text.includes('FUNCTION_INVOCATION_FAILED');
         setChipVerificationModal({
           orderId,
           order: targetOrder,
           paid: false,
-          rawStatus: 'ERROR',
+          rawStatus: isVercelInvocation ? 'REDEPLOYMENT REQUIRED' : 'SERVER RESPONSE',
           attemptsCount: 0,
           type: 'server_error',
-          message: data?.error || data?.message || 'Could not verify status on CHIP.'
+          message: isVercelInvocation
+            ? `Your live domain (onceuponmy.com) is currently running a prior Vercel build. Once you push/deploy this updated project on Vercel, real-time CHIP checking will connect directly. You can still manage or cancel this order below.`
+            : (errMsg || 'Could not verify status on CHIP.')
         });
       }
     } catch (err: any) {
+      const errMsg = String(err.message || '');
+      const isVercelInvocation = errMsg.includes('FUNCTION_INVOCATION_FAILED') || errMsg.includes('Server returned an HTML error page');
       setChipVerificationModal({
         orderId,
         order: targetOrder,
         paid: false,
-        rawStatus: 'NETWORK / SERVER ERROR',
+        rawStatus: isVercelInvocation ? 'REDEPLOYMENT REQUIRED' : 'SERVER ERROR',
         attemptsCount: 0,
         type: 'server_error',
-        message: err.message || 'Verification request failed.'
+        message: isVercelInvocation
+          ? `Your live deployment (onceuponmy.com) requires a redeploy to activate the latest serverless API route fix. You can still cancel this order or update its status using the buttons below.`
+          : (errMsg || 'Verification request failed.')
       });
     } finally {
       setVerifyingOrderId(null);
