@@ -274,7 +274,7 @@ export const CartView: React.FC<CartViewProps> = ({
                              <div className="bg-brand-gold/[0.04] px-4 py-3.5 border-t border-brand-gold/15 text-[10px] font-sans leading-relaxed text-gray-600 space-y-1.5">
                                {isSig && swaddleCount > 0 && (
                                  <p className="text-brand-gold font-medium italic">
-                                   Note: Swaddles already include a complimentary 1st Edition Box! Only buy this if you need an extra for a blanket.
+                                   Note: Swaddles already include a complimentary 2nd Edition Box! Only buy this if you need an extra for a blanket.
                                  </p>
                                )}
                                <p className="flex items-start gap-1.5 font-medium">
