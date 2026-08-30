@@ -502,6 +502,20 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
   const [copiedType, setCopiedType] = useState<string | null>(null);
   const [customDomainInput, setCustomDomainInput] = useState<string>('https://onceuponmy.com');
 
+  // CHIP In-App Verification Modal State
+  const [chipVerificationModal, setChipVerificationModal] = useState<{
+    orderId: string;
+    order?: Order;
+    paid: boolean;
+    rawStatus: string;
+    attemptsCount: number;
+    message: string;
+    purchaseId?: string;
+    failureReason?: string | null;
+    type: 'paid' | 'error' | 'cancelled' | 'not_found' | 'unpaid' | 'server_error';
+  } | null>(null);
+  const [isUpdatingFromChipModal, setIsUpdatingFromChipModal] = useState<boolean>(false);
+
   const productionWebhookUrl = 'https://onceuponmy.com/api/chip/webhook';
   const currentEnvWebhookUrl = typeof window !== 'undefined' 
     ? `${window.location.origin}/api/chip/webhook` 
@@ -556,6 +570,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
 
   const handleVerifySingleOrderWithChip = async (orderId: string) => {
     setVerifyingOrderId(orderId);
+    const targetOrder = orders.find(o => o.id === orderId || o.id === orderId.replace(/^#/, ''));
     try {
       const resp = await fetch(`/api/chip/verify/${encodeURIComponent(orderId)}`);
       const text = await resp.text();
@@ -563,51 +578,88 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       try {
         data = JSON.parse(text);
       } catch (parseErr) {
-        throw new Error(text.startsWith('<') ? 'Server error occurred during verification. Check backend connection.' : text.substring(0, 100));
+        throw new Error(text.startsWith('<') ? 'Server returned an HTML error page. Please make sure the backend API is deployed.' : text.substring(0, 120));
       }
 
       if (resp.ok && data.paid) {
-        alert(`✅ Order #${orderId} is confirmed PAID on CHIP!\n\n• Status: PAID\n• Purchase ID: ${data.purchaseId || 'Confirmed'}\n\nThe order status in the dashboard has been updated.`);
+        setChipVerificationModal({
+          orderId,
+          order: targetOrder,
+          paid: true,
+          rawStatus: 'PAID',
+          attemptsCount: data.attempts_count || 1,
+          purchaseId: data.purchaseId,
+          type: 'paid',
+          message: data.message || `Order #${orderId} has been verified and confirmed PAID on CHIP. Status has been automatically updated in your store.`
+        });
       } else if (resp.ok && !data.paid) {
         const rawStatus = (data.chip_status || data.status || 'unpaid').toLowerCase();
         const attempts = data.attempts_count || 1;
 
         if (rawStatus === 'error' || rawStatus === 'failed') {
-          alert(
-            `⚠️ Order #${orderId} - Payment Error on CHIP\n\n` +
-            `• CHIP Status: ERROR / FAILED\n` +
-            `• Attempts on CHIP: ${attempts}\n` +
-            `• Reason: Customer initiated checkout, but the payment was rejected by their bank (e.g. OTP failure/insufficient funds) or the session failed.\n\n` +
-            `💡 What to do:\n` +
-            `- Leave as "Pending": The system will automatically cancel and restock it in 60 minutes.\n` +
-            `- Or switch status to "Cancelled" right away if the customer will not retry.`
-          );
+          setChipVerificationModal({
+            orderId,
+            order: targetOrder,
+            paid: false,
+            rawStatus: 'ERROR / DECLINED',
+            attemptsCount: attempts,
+            type: 'error',
+            failureReason: data.failure_reason,
+            message: `Customer reached the checkout page, but their bank payment failed or was declined (e.g. OTP failure, insufficient balance, or rejected transaction).`
+          });
         } else if (rawStatus === 'cancelled' || rawStatus === 'expired') {
-          alert(
-            `❌ Order #${orderId} - Cancelled / Expired on CHIP\n\n` +
-            `• CHIP Status: ${rawStatus.toUpperCase()}\n` +
-            `• Reason: The customer aborted the payment or the bank payment window timed out.\n\n` +
-            `💡 You can change the order status to "Cancelled" to immediately restore inventory.`
-          );
+          setChipVerificationModal({
+            orderId,
+            order: targetOrder,
+            paid: false,
+            rawStatus: rawStatus.toUpperCase(),
+            attemptsCount: attempts,
+            type: 'cancelled',
+            failureReason: data.failure_reason,
+            message: `The payment session was aborted by the customer or timed out on the payment gateway.`
+          });
         } else if (rawStatus === 'not_found') {
-          alert(
-            `ℹ️ Order #${orderId} - No Session on CHIP\n\n` +
-            `• CHIP Status: Not Found\n` +
-            `• Reason: The customer placed the order but did not complete opening or connecting to the CHIP payment gateway.\n\n` +
-            `💡 If unpaid, you can leave it to auto-expire or cancel it manually.`
-          );
+          setChipVerificationModal({
+            orderId,
+            order: targetOrder,
+            paid: false,
+            rawStatus: 'NOT FOUND',
+            attemptsCount: 0,
+            type: 'not_found',
+            message: `No active or past transaction was recorded on CHIP for this order ID. The customer may have abandoned the page before initiating payment.`
+          });
         } else {
-          alert(
-            `⏳ Order #${orderId} - Unpaid on CHIP\n\n` +
-            `• CHIP Status: ${rawStatus.toUpperCase()}\n` +
-            `• Message: ${data.message || 'Payment has not been completed yet.'}`
-          );
+          setChipVerificationModal({
+            orderId,
+            order: targetOrder,
+            paid: false,
+            rawStatus: rawStatus.toUpperCase(),
+            attemptsCount: attempts,
+            type: 'unpaid',
+            message: data.message || `Order has not been marked as paid on CHIP yet.`
+          });
         }
       } else {
-        alert(`Verification response for Order #${orderId}:\n${data?.error || data?.message || 'Could not verify status on CHIP.'}`);
+        setChipVerificationModal({
+          orderId,
+          order: targetOrder,
+          paid: false,
+          rawStatus: 'ERROR',
+          attemptsCount: 0,
+          type: 'server_error',
+          message: data?.error || data?.message || 'Could not verify status on CHIP.'
+        });
       }
     } catch (err: any) {
-      alert(`Verification failed for Order #${orderId}:\n${err.message}`);
+      setChipVerificationModal({
+        orderId,
+        order: targetOrder,
+        paid: false,
+        rawStatus: 'NETWORK / SERVER ERROR',
+        attemptsCount: 0,
+        type: 'server_error',
+        message: err.message || 'Verification request failed.'
+      });
     } finally {
       setVerifyingOrderId(null);
     }
@@ -3017,6 +3069,177 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                   {isSavingOrder ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
                   Save Changes
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CHIP Verification In-App Modal Dialog */}
+        {chipVerificationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-white rounded-lg shadow-2xl max-w-lg w-full overflow-hidden border border-brand-latte/30 animate-scale-in">
+              {/* Modal Header */}
+              <div className="p-5 border-b border-brand-latte/20 flex items-center justify-between bg-brand-grey/10">
+                <div className="flex items-center gap-2.5">
+                  <CreditCard className="text-brand-flamingo" size={20} />
+                  <div>
+                    <h3 className="font-serif text-lg font-bold text-gray-900 leading-tight">
+                      CHIP Gateway Verification
+                    </h3>
+                    <p className="text-[11px] text-gray-500 font-sans">
+                      Live status report for Order #{chipVerificationModal.orderId}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setChipVerificationModal(null)}
+                  className="text-gray-400 hover:text-gray-700 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 space-y-4">
+                {/* Status Hero Badge */}
+                <div className={`p-4 rounded-md border flex items-start gap-3 ${
+                  chipVerificationModal.type === 'paid'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : chipVerificationModal.type === 'error'
+                    ? 'bg-amber-50 border-amber-200 text-amber-900'
+                    : chipVerificationModal.type === 'cancelled'
+                    ? 'bg-gray-50 border-gray-300 text-gray-800'
+                    : chipVerificationModal.type === 'not_found'
+                    ? 'bg-blue-50 border-blue-200 text-blue-900'
+                    : 'bg-red-50 border-red-200 text-red-900'
+                }`}>
+                  <div className="mt-0.5">
+                    {chipVerificationModal.type === 'paid' ? (
+                      <Check className="text-green-600" size={20} />
+                    ) : chipVerificationModal.type === 'error' ? (
+                      <AlertTriangle className="text-amber-600" size={20} />
+                    ) : chipVerificationModal.type === 'cancelled' ? (
+                      <Clock className="text-gray-500" size={20} />
+                    ) : (
+                      <CreditCard className="text-blue-600" size={20} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold uppercase tracking-wider mb-0.5">
+                      Gateway Result: {chipVerificationModal.rawStatus}
+                    </div>
+                    <div className="text-sm font-medium leading-relaxed">
+                      {chipVerificationModal.message}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order & Transaction Details Card */}
+                <div className="bg-gray-50 rounded-md border border-brand-latte/20 p-4 space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-gray-200/60">
+                    <span className="text-gray-500 font-medium">Order Number:</span>
+                    <span className="font-bold text-gray-800 font-mono">#{chipVerificationModal.orderId}</span>
+                  </div>
+                  {chipVerificationModal.order && (
+                    <>
+                      <div className="flex justify-between py-1 border-b border-gray-200/60">
+                        <span className="text-gray-500 font-medium">Customer:</span>
+                        <span className="font-semibold text-gray-800">{chipVerificationModal.order.customerName} ({chipVerificationModal.order.customerEmail})</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200/60">
+                        <span className="text-gray-500 font-medium">Order Amount:</span>
+                        <span className="font-bold text-brand-flamingo">RM {chipVerificationModal.order.total?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-gray-200/60">
+                        <span className="text-gray-500 font-medium">Current Store Status:</span>
+                        <span className="uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 text-[10px]">
+                          {chipVerificationModal.order.status}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between py-1 border-b border-gray-200/60">
+                    <span className="text-gray-500 font-medium">Attempts on CHIP:</span>
+                    <span className="font-semibold text-gray-800">{chipVerificationModal.attemptsCount} attempt(s)</span>
+                  </div>
+                  {chipVerificationModal.purchaseId && (
+                    <div className="flex justify-between py-1">
+                      <span className="text-gray-500 font-medium">CHIP Purchase ID:</span>
+                      <span className="font-mono text-gray-700 text-[11px]">{chipVerificationModal.purchaseId}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Explanation and Next Steps */}
+                <div className="bg-brand-latte/10 rounded-md p-3.5 border border-brand-latte/20 text-xs text-gray-700 space-y-1.5">
+                  <div className="font-bold text-gray-900 flex items-center gap-1.5">
+                    💡 Recommended Action:
+                  </div>
+                  {chipVerificationModal.paid ? (
+                    <p className="text-gray-600">
+                      The order has been verified and confirmed paid. You can now prepare items for packaging.
+                    </p>
+                  ) : (
+                    <p className="text-gray-600">
+                      If the customer will not retry paying, you can <strong>Cancel Order</strong> below to immediately release reserved items back into store inventory.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer / Actions */}
+              <div className="p-4 bg-gray-50 border-t border-brand-latte/20 flex items-center justify-between gap-3">
+                <div>
+                  {!chipVerificationModal.paid && chipVerificationModal.order?.status !== 'cancelled' && (
+                    <button
+                      type="button"
+                      disabled={isUpdatingFromChipModal}
+                      onClick={async () => {
+                        if (!chipVerificationModal.order) return;
+                        setIsUpdatingFromChipModal(true);
+                        try {
+                          await handleStatusUpdate(chipVerificationModal.orderId, 'cancelled', chipVerificationModal.order.status);
+                          setChipVerificationModal(null);
+                        } finally {
+                          setIsUpdatingFromChipModal(false);
+                        }
+                      }}
+                      className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 px-3.5 py-2 rounded text-xs font-bold tracking-wider uppercase transition-colors flex items-center gap-1.5"
+                    >
+                      <Trash2 size={13} />
+                      Cancel & Restore Stock
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!chipVerificationModal.paid && (
+                    <button
+                      type="button"
+                      disabled={isUpdatingFromChipModal}
+                      onClick={async () => {
+                        if (!chipVerificationModal.order) return;
+                        setIsUpdatingFromChipModal(true);
+                        try {
+                          await handleStatusUpdate(chipVerificationModal.orderId, 'paid', chipVerificationModal.order.status);
+                          setChipVerificationModal(null);
+                        } finally {
+                          setIsUpdatingFromChipModal(false);
+                        }
+                      }}
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-300 px-3.5 py-2 rounded text-xs font-bold tracking-wider uppercase transition-colors"
+                    >
+                      Mark as Paid
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setChipVerificationModal(null)}
+                    className="bg-brand-flamingo hover:bg-brand-flamingo/90 text-white px-4 py-2 rounded text-xs font-bold tracking-wider uppercase transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>
