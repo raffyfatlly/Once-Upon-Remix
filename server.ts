@@ -1,9 +1,10 @@
 import express from "express";
 import path from "path";
 import crypto from "crypto";
+import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import nodemailer from "nodemailer";
-import { db } from "./firebase.ts";
+import { db } from "./firebase";
 import { collection, query, where, getDocs, limit, doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
 
 export const DEFAULT_CHIP_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
@@ -552,19 +553,7 @@ app.use(express.urlencoded({
   // CHIP ORDER VERIFICATION & RESCUE HELPER
   // Actively verifies an order against the CHIP Gateway API and rescues it to PAID
   // ---------------------------------------------------------------------------
-  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{
-    paid: boolean;
-    status: string;
-    rescued?: boolean;
-    order?: any;
-    note?: string;
-    purchaseId?: string;
-    chip_status?: string;
-    attempts_count?: number;
-    failure_reason?: string | null;
-    latest_attempt_id?: string | null;
-    message?: string;
-  }> => {
+  const verifyAndRescueSingleOrder = async (orderIdParam: string, apiKey: string): Promise<{ paid: boolean; status: string; rescued?: boolean; order?: any; note?: string; purchaseId?: string }> => {
     const cleanOrderId = (orderIdParam || '').replace(/^#/, '').trim();
     if (!cleanOrderId || !db) {
       return { paid: false, status: 'unknown', note: 'Missing order ID or DB' };
@@ -755,29 +744,14 @@ app.use(express.urlencoded({
         status: 'paid',
         rescued: true,
         order: orderData,
-        purchaseId: paidMatch.id,
-        chip_status: paidMatch.status || 'paid',
-        message: `Order #${cleanOrderId} is verified and confirmed PAID on CHIP.`
+        purchaseId: paidMatch.id
       };
     }
-
-    const matchingPurchases = candidatePurchases.filter(p => isMatchingOrderPurchase(p));
-    const latestAttempt = matchingPurchases[0];
-    const chipStatus = latestAttempt ? (latestAttempt.status || latestAttempt.payment?.status || 'unpaid') : 'not_found';
-    const failureReason = latestAttempt?.transaction_data?.error_message || latestAttempt?.error_message || latestAttempt?.status_history?.[0]?.message || null;
-    const attemptsCount = matchingPurchases.length;
 
     return {
       paid: false,
       status: orderData.status,
-      chip_status: chipStatus,
-      attempts_count: attemptsCount,
-      failure_reason: failureReason,
-      latest_attempt_id: latestAttempt?.id || null,
-      order: orderData,
-      message: chipStatus === 'not_found'
-        ? `No checkout session found on CHIP for Order #${cleanOrderId}. Customer might have closed the browser before reaching the payment gateway.`
-        : `Found ${attemptsCount} attempt(s) on CHIP. Latest status is "${String(chipStatus).toUpperCase()}". Payment was declined by bank, aborted, or expired.`
+      order: orderData
     };
   };
 
@@ -1033,33 +1007,28 @@ Format your response in Markdown with clear headings and bullet points.`;
 
 async function startServer() {
   // If running in Vercel serverless function environment, do not start local HTTP listener
-  if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION) {
+  if (process.env.VERCEL) {
     return;
   }
 
-  try {
-    // Vite middleware for development
-    if (process.env.NODE_ENV !== "production") {
-      const { createServer: createViteServer } = await import("vite");
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: "spa",
-      });
-      app.use(vite.middlewares);
-    } else {
-      const distPath = path.join(process.cwd(), 'dist');
-      app.use(express.static(distPath));
-      app.get('*all', (req, res) => {
-        res.sendFile(path.join(distPath, 'index.html'));
-      });
-    }
-
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
     });
-  } catch (serverErr) {
-    console.error("[Server Init Error]:", serverErr);
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*all', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
 }
 
 startServer();
