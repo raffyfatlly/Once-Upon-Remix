@@ -461,19 +461,10 @@ export const getCustomerOrders = async (email: string): Promise<Order[]> => {
 export const getOrderById = async (orderId: string): Promise<Order | null> => {
   if (!db) throw new Error("Database not connected.");
   try {
-    const rawId = String(orderId || '').trim();
-    const cleanId = rawId.replace(/^#/, '').trim();
-    let docRef = doc(db, 'orders', cleanId);
-    let docSnap = await getDoc(docRef);
+    const docRef = doc(db, 'orders', orderId);
+    const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
       return { id: docSnap.id, ...docSnap.data() } as Order;
-    }
-    if (rawId && rawId !== cleanId) {
-      docRef = doc(db, 'orders', rawId);
-      docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() } as Order;
-      }
     }
     return null;
   } catch (error) {

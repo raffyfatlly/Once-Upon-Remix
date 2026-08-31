@@ -114,10 +114,7 @@ export const OrderLookup: React.FC = () => {
         
         let order = await getOrderById(orderId.trim());
         
-        const customerEmailNorm = (order?.customerEmail || '').toLowerCase().trim();
-        const inputEmailNorm = email.toLowerCase().trim();
-
-        if (order && customerEmailNorm === inputEmailNorm) {
+        if (order && order.customerEmail.toLowerCase() === email.toLowerCase()) {
            // If order is pending or cancelled, verify against CHIP to ensure status is up to date
            if (order.status === 'pending' || order.status === 'cancelled' || order.status === 'failed') {
              try {
