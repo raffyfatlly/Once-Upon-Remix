@@ -1,12 +1,10 @@
 
 {
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/l/(.*)", "destination": "/api/index" },
-    { "source": "/cakenic", "destination": "/api/index" },
-    { "source": "/cakenic-event", "destination": "/api/index" },
+    { "source": "/api/chip/(.*)", "destination": "https://gate.chip-in.asia/api/v1/$1" },
     { "source": "/sw.js", "destination": "/sw.js" },
     { "source": "/manifest.json", "destination": "/manifest.json" },
+    { "source": "/l/(.*)", "destination": "/api/index" },
     { "source": "/((?!.*\\.).*)", "destination": "/index.html" }
   ]
 }

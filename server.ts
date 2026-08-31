@@ -21,22 +21,23 @@ dDziUycgJOaBuwgOrXdCzNRV5pc5KskSaCdTtd2JhWVZAgMBAAE=
 
 export const app = express();
 
-const PORT = 3000;
+async function startServer() {
+  const PORT = 3000;
 
-app.use(express.json({
-  verify: (req: any, _res, buf) => {
-    req.rawBody = buf.toString('utf8');
-  }
-}));
-app.use(express.urlencoded({
-  extended: true,
-  verify: (req: any, _res, buf) => {
-    req.rawBody = buf.toString('utf8');
-  }
-}));
+  app.use(express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    }
+  }));
+  app.use(express.urlencoded({
+    extended: true,
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf.toString('utf8');
+    }
+  }));
 
-// ---------------------------------------------------------------------------
-// CAKENIC CLEAN URL SERVER-SIDE REDIRECT HANDLER (/cakenic, /cakenic-event)
+  // ---------------------------------------------------------------------------
+  // CAKENIC CLEAN URL SERVER-SIDE REDIRECT HANDLER (/cakenic, /cakenic-event)
   // Performs a 302 HTTP redirect from clean path /cakenic to hash route /#/cakenic
   // for Instagram bio links and direct browser access.
   // ---------------------------------------------------------------------------
@@ -608,13 +609,12 @@ app.use(express.urlencoded({
       if (!p) return false;
       const st = (p.status || '').toString().toLowerCase();
       const evt = (p.event_type || '').toString().toLowerCase();
-      const paySt = (p.payment?.status || p.transaction_data?.status || '').toString().toLowerCase();
-      const isPaidFlag = p.is_paid === true || p.paid === true || p.transaction_data?.is_paid === true;
+      const paySt = (p.payment?.status || '').toString().toLowerCase();
       return (
         st === 'paid' || st === 'cleared' || st === 'settled' || st === 'completed' || st === 'success' || st === 'authorized' ||
-        evt === 'purchase.paid' || evt === 'payment.paid' || evt === 'purchase.settled' || evt === 'purchase.authorized' || evt === 'payment.success' ||
+        evt === 'purchase.paid' || evt === 'payment.paid' || evt === 'purchase.settled' || evt === 'purchase.authorized' ||
         paySt === 'paid' || paySt === 'success' || paySt === 'cleared' || paySt === 'settled' || paySt === 'authorized' ||
-        isPaidFlag
+        p.is_paid === true
       );
     };
 
@@ -673,7 +673,7 @@ app.use(express.urlencoded({
         });
         if (listResp.ok) {
           const listData = await listResp.json();
-          const items = Array.isArray(listData) ? listData : listData?.results || listData?.data || [];
+          const items = Array.isArray(listData) ? listData : listData?.results || [];
           items.forEach((item: any) => candidatePurchases.push(item));
         }
       } catch (err) {
@@ -688,7 +688,7 @@ app.use(express.urlencoded({
       });
       if (listResp.ok) {
         const listData = await listResp.json();
-        const items = Array.isArray(listData) ? listData : listData?.results || listData?.data || [];
+        const items = Array.isArray(listData) ? listData : listData?.results || [];
         items.forEach((item: any) => candidatePurchases.push(item));
       }
     } catch (err) {
@@ -1004,12 +1004,6 @@ Format your response in Markdown with clear headings and bullet points.`;
       res.status(500).json({ error: error.message || "Failed to send email." });
     }
   });
-
-async function startServer() {
-  // If running in Vercel serverless function environment, do not start local HTTP listener
-  if (process.env.VERCEL) {
-    return;
-  }
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
