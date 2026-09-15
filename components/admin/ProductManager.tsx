@@ -244,7 +244,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         id: 'cakenic-ticket-johor',
         name: 'Cakenic JOHOR',
         price: 88,
-        description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden (Theme: Rocco Garden) featuring curated gift bags, prizes, and a dream botanical picnic setting. Saturday, October 24, 2026.',
+        description: "An exclusive Southern Cakenic gathering at Eco Spring Garden (Theme: Rocco's Masquerade) featuring curated gift bags, prizes, and a dream botanical picnic setting. Saturday, October 24, 2026.",
         image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
         collection: 'Cakenic Ticket',

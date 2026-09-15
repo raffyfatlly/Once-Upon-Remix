@@ -217,7 +217,7 @@ export const CakenicTicketView: React.FC<CakenicTicketViewProps> = ({ order, onC
             <div>
               <strong className="text-[#332524] block font-semibold">Event Theme:</strong>
               <span className="font-semibold text-[#8C5247]">
-                {ticketItem?.name?.toLowerCase().includes('putrajaya') ? 'European Classical' : 'Rocco Garden'}
+                {ticketItem?.name?.toLowerCase().includes('putrajaya') ? 'European Classical' : "Rocco's Masquerade"}
               </span>
             </div>
           </div>

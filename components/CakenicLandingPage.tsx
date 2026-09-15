@@ -56,7 +56,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     city: 'JOHOR',
     venue: 'Eco Spring Garden, Johor',
     fullAddress: 'Eco Spring Garden, Jalan Ekoflora 1, Taman Ekoflora, 81100 Johor Bahru, Johor',
-    theme: 'Rocco Garden',
+    theme: "Rocco's Masquerade",
     date: 'Saturday, October 24, 2026',
     time: '4:00 PM – 7:00 PM',
     price: 88,
@@ -64,7 +64,7 @@ const CAKENIC_LOCATIONS: CakenicLocationTicket[] = [
     popular: true,
     image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
     availableSlots: 30,
-    description: 'An exclusive Southern Cakenic gathering at Eco Spring Garden with a grand Rocco Garden theme, featuring curated gift bags, prizes, and a dream botanical picnic setting.'
+    description: "An exclusive Southern Cakenic gathering at Eco Spring Garden with a grand Rocco's Masquerade theme, featuring curated gift bags, prizes, and a dream botanical picnic setting."
   }
 ];
 
@@ -896,7 +896,7 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                       </p>
                       <div className="pt-1.5 space-y-1 text-[10.5px] text-[#7A3E34] bg-white/40 p-2 rounded-lg border border-white/50">
                         <div>🌸 <strong>Putrajaya:</strong> European Classical Theme</div>
-                        <div>🌿 <strong>Johor:</strong> Rocco Garden Theme</div>
+                        <div>🌿 <strong>Johor:</strong> Rocco's Masquerade Theme</div>
                       </div>
                     </div>
 
