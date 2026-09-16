@@ -667,58 +667,78 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
             {/* TAB CONTENT AREA WITH TRANSPARENT GLASS BACKGROUND */}
             <div className="flex-1 overflow-y-auto my-1 bg-white/45 backdrop-blur-xl rounded-2xl p-4 sm:p-5 text-[#332524] shadow-xl border border-white/70 scrollbar-thin scrollbar-thumb-white/40 flex flex-col justify-between">
               
-              {/* TAB 1: EVENT ESSENTIALS (MOST CRITICAL DECISION INFO FIRST - FRIENDLY & INVITATORY!) */}
+              {/* TAB 1: EVENT ESSENTIALS */}
               {activeGuidelineTab === 'essentials' && (
                 <div className="space-y-3 text-xs animate-fadeIn">
                   <div className="border-b border-[#332524]/15 pb-2">
                     <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
-                      <span>✨</span> Good to Know Before You Join
+                      <span>📋</span> What to Know Before Cake Day
                     </h3>
-                    <p className="text-[10px] text-[#7A3E34] font-bold mt-0.5">
-                      Everything you need for a wonderful Cake Day!
-                    </p>
                   </div>
 
                   <div className="space-y-2.5">
-                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
-                      <span className="text-base shrink-0">🎟️</span>
+                    {/* One Cake = One Entry */}
+                    <div className="bg-white/55 backdrop-blur-md p-3 rounded-xl border border-white/60 shadow-sm space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base shrink-0">✨</span>
+                        <strong className="text-[#332524] font-bold text-[11.5px]">One Cake = One Entry</strong>
+                      </div>
+                      <p className="text-[#523A36] text-[10.5px] leading-relaxed font-medium pl-6">
+                        This is a one cake = one entry event. To keep the space comfortable and spacious for everyone, we’re unable to allow non-ticketed guests (including children, spouses, or friends) into the private picnic area — even just to help carry or set up.
+                      </p>
+                      <div className="bg-white/60 rounded-lg p-2 text-[10px] text-[#7A3E34] leading-relaxed font-medium flex items-start gap-1.5 ml-6 border border-white/60">
+                        <span>💁‍♀️</span>
+                        <span>Don’t worry — our team will be there with helping hands if you need any assistance carrying in your cake or picnic items 💕</span>
+                      </div>
+                    </div>
+
+                    {/* Participant Age */}
+                    <div className="bg-white/55 backdrop-blur-md p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🌸</span>
                       <div>
-                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Ticket = 1 Entry (Age 12+)</strong>
-                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Every participant needs a ticket to enter. Minimum age is <strong>12 years old</strong>.
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">Participant Age</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          For this event, the minimum age for participant is <strong>12 years old</strong> — so everyone can join in the fun and cake dash safely together ✨
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
-                      <span className="text-base shrink-0">🎂</span>
+                    {/* Why ticket? */}
+                    <div className="bg-white/55 backdrop-blur-md p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🧺</span>
                       <div>
-                        <strong className="block text-[#332524] font-bold text-[11.5px]">1 Whole Uncut Cake Required</strong>
-                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Each participant brings <strong>1 whole uncut cake</strong> (min. 8 inches, 100% halal) to place on the cake display table!
+                        <strong className="block text-[#332524] font-bold text-[11.5px]">What Your Ticket Supports</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          Ticket sales directly support the venue rental, equipment, event services, logistics, and sweet goodie bags prepared for every single participant — all to make sure we create the warmest, prettiest experience for you to enjoy 🌷
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                    {/* Check-in & wristband */}
+                    <div className="bg-white/55 backdrop-blur-md p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
                       <span className="text-base shrink-0">🎀</span>
                       <div>
                         <strong className="block text-[#332524] font-bold text-[11.5px]">Check-In & Wristband</strong>
-                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Present your <strong>Order No.</strong> or confirmation email at registration to collect your event wristband.
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          When you arrive, simply flash your Order No. or confirmation email at the registration table to grab your wristband. It’s quick and easy, and then you’re all set to mingle 💫
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-white/50 backdrop-blur-md p-2.5 sm:p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                    {/* Ticket Terms & Transfers */}
+                    <div className="bg-white/55 backdrop-blur-md p-3 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
                       <span className="text-base shrink-0">💌</span>
                       <div>
                         <strong className="block text-[#332524] font-bold text-[11.5px]">Ticket Terms & Transfers</strong>
-                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium">
-                          Tickets are non-refundable and valid only for your booked session.
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          Because goodie bags, rentals, and seating are arranged ahead of time for the exact number of guests, tickets are non-refundable. But if plans change and you can’t make it, you are always more than welcome to gift or transfer your ticket to a friend or family member 💛
                         </span>
                       </div>
                     </div>
+
+                    <p className="text-center text-[10px] text-[#7A3E34] font-medium pt-1 italic">
+                      Thank you for understanding and helping us create a lovely experience for all 💛
+                    </p>
                   </div>
                 </div>
               )}
@@ -728,32 +748,73 @@ export const CakenicLandingPage: React.FC<CakenicLandingPageProps> = ({ onAddToC
                 <div className="space-y-2.5 text-xs animate-fadeIn">
                   <div className="border-b border-[#332524]/15 pb-2">
                     <h3 className="font-serif text-base font-bold text-[#332524] flex items-center gap-1.5">
-                      <span>🎂</span> Cake Rules & Guidelines
+                      <span>🎂</span> So what’s happening?
                     </h3>
+                    <p className="text-[10px] text-[#7A3E34] font-medium mt-0.5">
+                      Everyone brings <strong>one whole cake (uncut)</strong> — something you’re proud of.
+                    </p>
                   </div>
 
-                  <ul className="space-y-2 text-[10.5px] text-[#332524]">
-                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
-                      <span className="text-sm shrink-0">🎂</span>
-                      <div><strong>1 Whole Cake (Uncut):</strong> Minimum 8 inches so there's plenty to share.</div>
-                    </li>
-                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
-                      <span className="text-sm shrink-0">✨</span>
-                      <div><strong>100% Halal:</strong> Strictly no alcohol, rum, or non-halal ingredients.</div>
-                    </li>
-                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
-                      <span className="text-sm shrink-0">💗</span>
-                      <div><strong>Any Flavor:</strong> Home-baked or store-bought! Simple or fancy, all cakes are welcome.</div>
-                    </li>
-                    <li className="flex items-start gap-2 bg-white/50 backdrop-blur-md p-2 rounded-xl border border-white/60 shadow-sm">
-                      <span className="text-sm shrink-0">☀️</span>
-                      <div><strong>Outdoor Friendly:</strong> Avoid ice cream cakes or delicate toppings that melt quickly outdoors.</div>
-                    </li>
-                    <li className="flex items-start gap-2 bg-white/65 backdrop-blur-md p-2.5 rounded-xl border border-[#E3A099]/40 text-[#8C5247] shadow-sm">
-                      <span className="text-sm shrink-0">📦</span>
-                      <div><strong>Cake Box Provided:</strong> Each participant receives a cake box to fill with your favorite cake slices during the Cake Dash!</div>
-                    </li>
-                  </ul>
+                  <div className="space-y-2 text-[10.5px] text-[#332524]">
+                    {/* Cake type and freedom */}
+                    <div className="bg-white/55 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">✨</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11px]">Any Style, Any Flavor</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          It can be simple. It can be dramatic. It can be something you’ve always wanted to try. Home-baked or from your favorite bakery — totally up to you ✨
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Size rule */}
+                    <div className="bg-white/55 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">🎂</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11px]">Size & Sharing</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          The only “rule” is: your cake should be <strong>at least 8 inches</strong>, so there’s plenty for everyone to share.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Halal requirement */}
+                    <div className="bg-white/55 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">💗</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11px]">100% Halal</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          Just make sure it’s <strong>halal</strong> (no alcohol or non-halal ingredients). And don’t worry about perfection — cakes made with love are always the best 💗
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Outdoor friendly */}
+                    <div className="bg-white/55 backdrop-blur-md p-2.5 rounded-xl border border-white/60 shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">☀️</span>
+                      <div>
+                        <strong className="block text-[#332524] font-bold text-[11px]">Garden Friendly</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          Since we’ll be enjoying the afternoon breeze outdoors, please avoid ice cream cakes or delicate toppings that melt quickly in the sun — we want your cake to stay looking its best! 🍃
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cake Box Provided */}
+                    <div className="bg-white/65 backdrop-blur-md p-2.5 rounded-xl border border-[#E3A099]/40 text-[#8C5247] shadow-sm flex items-start gap-2.5">
+                      <span className="text-base shrink-0">📦</span>
+                      <div>
+                        <strong className="block text-[#8C5247] font-bold text-[11px]">Cake Box Provided</strong>
+                        <span className="text-[#523A36] text-[10.5px] leading-relaxed block font-medium mt-0.5">
+                          Each participant receives a cake box to fill with all your favorite slices during the Cake Dash 🍰
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-[10px] text-[#7A3E34] font-medium pt-1 italic">
+                    Thank you for understanding and helping us create a lovely experience for all 💛
+                  </p>
                 </div>
               )}
 
