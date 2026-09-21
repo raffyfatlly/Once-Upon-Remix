@@ -108,10 +108,9 @@ export const ShippingPolicy: React.FC = () => (
          <div>
            <strong>East Malaysia (Sabah & Sarawak):</strong><br/>
            <ul className="list-disc pl-5 mt-1 space-y-1">
-             <li>1 item: RM 15.00</li>
-             <li>2-3 items: RM 18.00</li>
-             <li>4-6 items: RM 20.00</li>
-             <li className="text-gray-500 italic">Additional items: +RM 5.00 per every 3 items</li>
+             <li>1 item: RM 20.00</li>
+             <li>2-3 items: RM 40.00</li>
+             <li>4-5 items: RM 60.00</li>
            </ul>
          </div>
          <div>

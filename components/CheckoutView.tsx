@@ -111,10 +111,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
       if (totalItems <= 6) return 75;
       return 75 + Math.ceil((totalItems - 6) / 3) * 15;
     } else if (region === 'east') {
-      if (totalItems === 1) return 15;
-      if (totalItems <= 3) return 18;
-      if (totalItems <= 6) return 20;
-      return 20 + Math.ceil((totalItems - 6) / 3) * 5; // + RM 5 for every 3 additional items
+      if (totalItems === 1) return 20;
+      if (totalItems <= 3) return 40;
+      if (totalItems <= 5) return 60;
+      return 60 + Math.ceil((totalItems - 5) / 2) * 20; // + RM 20 for every 2 additional items
     } else {
       if (totalItems === 1) return 8;
       if (totalItems <= 3) return 10;

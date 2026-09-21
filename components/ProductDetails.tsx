@@ -339,7 +339,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                 <div className="flex items-start gap-3"><Info size={16} className="text-brand-latte mt-1 flex-shrink-0" /><p>{product.care || 'Gentle hand wash recommended to preserve the softness of the fibers.'}</p></div>
               </AccordionItem>
               <AccordionItem title="Shipping & Returns" isOpen={openSection === 'shipping'} toggle={() => toggleSection('shipping')}>
-                 <div className="flex items-start gap-3"><Truck size={16} className="text-brand-latte mt-1 flex-shrink-0" /><div className="flex flex-col gap-3"><p>Delivery to West Malaysia starts at RM 8.00 (1 item), RM 10.00 (2-3 items), and RM 12.00 (4-6 items). </p><p>Shipping to East Malaysia starts at RM 15.00 (1 item), RM 18.00 (2-3 items), and RM 20.00 (4-6 items).</p><p className="italic text-brand-gold">Please kindly note that all sales are final. We are unable to accept returns or exchanges.</p></div></div>
+                 <div className="flex items-start gap-3"><Truck size={16} className="text-brand-latte mt-1 flex-shrink-0" /><div className="flex flex-col gap-3"><p>Delivery to West Malaysia starts at RM 8.00 (1 item), RM 10.00 (2-3 items), and RM 12.00 (4-6 items). </p><p>Shipping to East Malaysia (Sabah & Sarawak) is RM 20.00 (1 item), RM 40.00 (2-3 items), and RM 60.00 (4-5 items).</p><p className="italic text-brand-gold">Please kindly note that all sales are final. We are unable to accept returns or exchanges.</p></div></div>
               </AccordionItem>
             </div>
 
