@@ -31,9 +31,12 @@ try {
     app = getApp();
   }
   
-  db = getFirestore(app);
+  const firestoreDbId = (typeof process !== 'undefined' && process.env?.FIRESTORE_DATABASE_ID) || 
+                        ((import.meta as any).env?.VITE_FIRESTORE_DATABASE_ID) || 
+                        'asia-db';
+  db = getFirestore(app, firestoreDbId);
   storage = getStorage(app);
-  console.log("Firebase initialized successfully.");
+  console.log(`Firebase initialized successfully (database: ${firestoreDbId}).`);
 } catch (error) {
   console.error("CRITICAL FIREBASE ERROR:", error);
 }
