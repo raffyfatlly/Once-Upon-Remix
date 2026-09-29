@@ -929,7 +929,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
     let freeShippingSaved = 0;
 
     if (order.adminNotes) {
-      const autoPromoMatch = order.adminNotes.match(/Auto Blanket\/Swaddle Promo applied - Saved RM ([\d\.]+)/i);
+      const autoPromoMatch = order.adminNotes.match(/(?:Auto Blanket\/Swaddle Promo applied|Multi-Item Promo).*?Saved RM ([\d\.]+)/i);
       if (autoPromoMatch) {
         autoPromoDiscount = parseFloat(autoPromoMatch[1]);
       }
@@ -1302,7 +1302,7 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
             ` : ''}
             ${autoPromoDiscount > 0 ? `
             <div class="totals-row" style="color: #4A5D4F;">
-              <span class="totals-label">Promo Discount (RM 8/item)</span>
+              <span class="totals-label">Promo Discount (RM 8/item on Blankets & Swaddles)</span>
               <span class="totals-val">-RM ${autoPromoDiscount.toFixed(2)}</span>
             </div>
             ` : ''}

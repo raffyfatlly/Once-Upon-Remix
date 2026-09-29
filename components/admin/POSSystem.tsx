@@ -42,7 +42,7 @@ export const generateReceiptHtml = (order: Order, products?: Product[]): string 
   let freeShippingSaved = 0;
 
   if (order.adminNotes) {
-    const autoPromoMatch = order.adminNotes.match(/Auto Blanket\/Swaddle Promo applied - Saved RM ([\d\.]+)/i);
+    const autoPromoMatch = order.adminNotes.match(/(?:Auto Blanket\/Swaddle Promo applied|Multi-Item Promo).*?Saved RM ([\d\.]+)/i);
     if (autoPromoMatch) {
       autoPromoDiscount = parseFloat(autoPromoMatch[1]);
     }
@@ -419,7 +419,7 @@ export const generateReceiptHtml = (order: Order, products?: Product[]): string 
           ` : ''}
           ${autoPromoDiscount > 0 ? `
           <div class="totals-row" style="color: #4A5D4F;">
-            <span class="totals-label">Promo Discount (RM 8/item)</span>
+            <span class="totals-label">Promo Discount (RM 8/item on Blankets & Swaddles)</span>
             <span class="totals-val">-RM ${autoPromoDiscount.toFixed(2)}</span>
           </div>
           ` : ''}
@@ -523,7 +523,7 @@ export const generateReceiptText = (order: Order, products?: Product[]): string 
   let autoPromoDiscount = 0;
   let posDiscountAmount = 0;
   if (order.adminNotes) {
-    const autoPromoMatch = order.adminNotes.match(/Auto Blanket\/Swaddle Promo applied - Saved RM ([\d\.]+)/i);
+    const autoPromoMatch = order.adminNotes.match(/(?:Auto Blanket\/Swaddle Promo applied|Multi-Item Promo).*?Saved RM ([\d\.]+)/i);
     if (autoPromoMatch) autoPromoDiscount = parseFloat(autoPromoMatch[1]);
     
     const posDiscountMatch = order.adminNotes.match(/POS Discount Applied: .*? - Saved RM ([\d\.]+)/i);
@@ -541,7 +541,7 @@ export const generateReceiptText = (order: Order, products?: Product[]): string 
 
   let promoSection = '';
   if (autoPromoDiscount > 0) {
-    promoSection += `Promo Discount (RM 8/item): -RM ${autoPromoDiscount.toFixed(2)}\n`;
+    promoSection += `Promo Discount (RM 8/item on Blankets & Swaddles): -RM ${autoPromoDiscount.toFixed(2)}\n`;
   }
   if (posDiscountAmount > 0) {
     promoSection += `POS Discount: -RM ${posDiscountAmount.toFixed(2)}\n`;
@@ -678,26 +678,55 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
            category.includes('event') || 
            id.includes('cakenic');
   };
-  const isPerfumeOrHairOil = (p: Product) => {
-    if (!p || isCakenicTicketProduct(p)) return false;
-    const name = (p.name || '').toLowerCase();
-    return name.includes('perfume') || name.includes('hair oil') || name.includes('oil');
-  };
-  const isAddonProduct = (p: Product) => {
+  const isPerfumeOrHairOil = (p: Product | CartItem) => {
     if (!p || isCakenicTicketProduct(p)) return false;
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
-    return Boolean(p.isCheckoutAddon) || 
-           name.includes('perfume') || 
+    return name.includes('perfume') || 
            name.includes('hair oil') || 
-           name.includes('oil') || 
+           name.includes('hairoil') || 
+           name.includes('oil') ||
+           collection.includes('perfume') || 
+           collection.includes('oil') ||
+           category.includes('perfume') || 
+           category.includes('oil');
+  };
+
+  const isAddonProduct = (p: Product | CartItem) => {
+    if (!p || isCakenicTicketProduct(p)) return false;
+    const name = (p.name || '').toLowerCase();
+    const collection = (p.collection || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+    return Boolean((p as any).isCheckoutAddon) || 
+           isPerfumeOrHairOil(p) ||
+           name.includes('mirror') || 
+           name.includes('signature') || 
+           name.includes('card') || 
+           name.includes('box') || 
            collection.includes('add-on') || 
            collection.includes('addon') || 
            category.includes('add-on') || 
-           category.includes('addon');
+           category.includes('addon') ||
+           category.includes('gift box') ||
+           category.includes('box') ||
+           category.includes('card');
   };
-  const isBlanketProduct = (p: Product | CartItem) => !isCakenicTicketProduct(p) && !isAddonProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+
+  const isBlanketProduct = (p: Product | CartItem) => 
+    !isCakenicTicketProduct(p) && 
+    !isAddonProduct(p) && 
+    !isPerfumeOrHairOil(p) && 
+    (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+
+  const isSwaddleProduct = (p: Product | CartItem) => 
+    !isCakenicTicketProduct(p) && 
+    !isAddonProduct(p) && 
+    !isPerfumeOrHairOil(p) && 
+    !isBlanketProduct(p);
+
+  const isBlanketOrSwaddle = (p: Product | CartItem) => 
+    isBlanketProduct(p) || isSwaddleProduct(p);
 
   const swaddles = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
   const blankets = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
@@ -800,8 +829,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Auto RM 8 discount per item if totalItems > 1
-  const autoPromoDiscountAmount = (!isAutoPromoDeleted && totalItems > 1) ? (8 * totalItems) : 0;
+  // Blanket & Swaddle Auto Discount:
+  // ONLY applies to blankets and swaddles (excludes add-on items like mirror card, signature card, boxes, perfume, hair oil, tickets)
+  const qualifyingItems = cart.filter(item => isBlanketOrSwaddle(item));
+  const qualifyingItemsCount = qualifyingItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Auto RM 8 discount per blanket/swaddle item when purchasing 2 or more blankets/swaddles
+  const autoPromoDiscountAmount = (!isAutoPromoDeleted && qualifyingItemsCount > 1) ? (8 * qualifyingItemsCount) : 0;
 
   // Shipping cost if shipping pre-order
   const getStandardShippingCost = () => {
@@ -840,7 +874,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
     try {
       let promoNotes = [];
       if (!isAutoPromoDeleted && autoPromoDiscountAmount > 0) {
-        promoNotes.push(`[Multi-Item Promo: RM 8 off per item (${totalItems} items) - Saved RM ${autoPromoDiscountAmount.toFixed(2)}]`);
+        promoNotes.push(`[Auto Blanket/Swaddle Promo applied - Saved RM ${autoPromoDiscountAmount.toFixed(2)}]`);
       }
       if (isShippingPreOrder) {
         promoNotes.push('[Pre-Order Shipping]');
@@ -1111,7 +1145,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
             {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
               <div className="flex justify-between items-center text-xs md:text-sm text-brand-flamingo">
                 <div className="flex items-center gap-1.5">
-                  <span className="font-bold uppercase tracking-widest text-[10px] md:text-xs">🏷️ RM 8 Off Per Item ({totalItems} items)</span>
+                  <span className="font-bold uppercase tracking-widest text-[10px] md:text-xs">🏷️ RM 8 Off ({qualifyingItemsCount} Blankets/Swaddles)</span>
                   <button 
                     type="button"
                     onClick={() => setIsAutoPromoDeleted(true)}
@@ -1357,16 +1391,16 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                 <Sparkles size={16} className="text-brand-flamingo shrink-0" />
                 <div>
                   <h4 className="font-serif text-xs md:text-sm text-gray-900 font-semibold">
-                    🎁 Multi-Item Discount Active
+                    🎁 Blanket & Swaddle Multi-Item Promo
                   </h4>
                   <p className="text-[11px] text-gray-600 font-sans leading-tight">
-                    Add 2 or more items to get <strong className="text-brand-flamingo">RM 8.00 off per item</strong> automatically!
+                    Buy 2 or more blankets or swaddles to get <strong className="text-brand-flamingo">RM 8.00 off each</strong> automatically! (Excludes add-on items, perfume & hair oil)
                   </p>
                 </div>
               </div>
-              {totalItems > 1 && !isAutoPromoDeleted && (
+              {qualifyingItemsCount > 1 && !isAutoPromoDeleted && (
                 <span className="bg-brand-flamingo text-white text-[9px] font-bold uppercase px-2.5 py-1 rounded-full whitespace-nowrap shadow-sm">
-                  RM {autoPromoDiscountAmount.toFixed(2)} OFF ({totalItems} items)
+                  RM {autoPromoDiscountAmount.toFixed(2)} OFF ({qualifyingItemsCount} Blankets/Swaddles)
                 </span>
               )}
             </div>
@@ -1613,7 +1647,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               {!isAutoPromoDeleted && autoPromoDiscountAmount > 0 && (
                 <div className="flex justify-between items-center text-brand-flamingo text-xs">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold uppercase bg-brand-flamingo/10 px-1.5 py-0.5 rounded tracking-wider">🏷️ RM 8 Off Per Item ({totalItems})</span>
+                    <span className="text-[10px] font-bold uppercase bg-brand-flamingo/10 px-1.5 py-0.5 rounded tracking-wider">🏷️ RM 8 Off ({qualifyingItemsCount} Blankets/Swaddles)</span>
                     <button 
                       onClick={() => setIsAutoPromoDeleted(true)}
                       className="text-[10px] text-red-500 hover:underline font-bold uppercase tracking-wider cursor-pointer p-1.5 -my-1"
@@ -1672,13 +1706,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   
             {/* Promo Re-apply & Discount Buttons */}
             <div className="space-y-1.5 mb-3">
-              {(isAutoPromoDeleted && totalItems > 1) && (
+              {(isAutoPromoDeleted && qualifyingItemsCount > 1) && (
                 <button 
                   type="button"
                   onClick={() => setIsAutoPromoDeleted(false)}
                   className="w-full bg-brand-flamingo/5 border border-brand-flamingo/20 text-brand-flamingo py-2 font-bold uppercase tracking-widest text-[10px] rounded hover:bg-brand-flamingo/10 transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
-                  <Tag size={10} /> Re-apply RM 8 Multi-Item Promo
+                  <Tag size={10} /> Re-apply RM 8 Blanket/Swaddle Promo
                 </button>
               )}
               {(isShippingPreOrder && isFreeShippingPromoDeleted && standardShippingCost > 0) && (
