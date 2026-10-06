@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Instagram, Heart, Lock, MessageCircle, Cake } from 'lucide-react';
+import { Instagram, Heart, Lock, Cake } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface FooterProps {
@@ -26,22 +26,13 @@ export const Footer: React.FC<FooterProps> = ({ onAdminClick }) => {
         {/* Restored Social Icons: Thin & Elegant */}
         <div className="flex items-center justify-center gap-8 mb-10">
            <a 
-             href="https://www.instagram.com/onceuponbysyahirahkasim" 
+             href="https://www.instagram.com/onceuponbysyahirah?stkn=MXY0dWdhNWRoaG4zZQ==" 
              target="_blank" 
              rel="noopener noreferrer" 
              className="text-brand-gold hover:text-brand-flamingo transition-colors duration-300 transform hover:scale-105"
              aria-label="Instagram"
            >
              <Instagram size={20} strokeWidth={1.2} />
-           </a>
-           <a 
-             href="https://wa.link/ad5hui" 
-             target="_blank" 
-             rel="noopener noreferrer" 
-             className="text-brand-gold hover:text-brand-flamingo transition-colors duration-300 transform hover:scale-105"
-             aria-label="WhatsApp"
-           >
-             <MessageCircle size={20} strokeWidth={1.2} />
            </a>
         </div>
         
