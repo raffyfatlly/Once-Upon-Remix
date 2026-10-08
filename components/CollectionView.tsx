@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { ProductCard } from './ProductCard';
 import { AlertCircle, Star, Sparkles, Instagram } from 'lucide-react';
-import { getProductSlug } from '../constants';
+import { getProductSlug, sortCollectionProducts } from '../constants';
 
 interface CollectionViewProps {
   products: Product[];
@@ -32,7 +32,10 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
-  const filteredProducts = products.filter(p => getProductGroup(p) === collectionName);
+  const filteredProducts = React.useMemo(() => {
+    const list = products.filter(p => getProductGroup(p) === collectionName);
+    return sortCollectionProducts(collectionName, list);
+  }, [products, collectionName]);
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-20 animate-fade-in">

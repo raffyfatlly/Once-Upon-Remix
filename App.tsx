@@ -18,7 +18,7 @@ import { IntroOverlay } from './components/IntroOverlay';
 import { OurStory } from './components/OurStory';
 import { RefundPolicy, ShippingPolicy, PrivacyPolicy, TermsPolicy, BusinessInfoPolicy } from './components/Policies';
 import { LinkRedirector } from './components/LinkRedirector';
-import { getProductSlug } from './constants';
+import { getProductSlug, sortCollectionProducts } from './constants';
 import { AmbassadorLogin } from './components/AmbassadorLogin';
 import { AmbassadorDashboard } from './components/AmbassadorDashboard';
 import { CakenicLandingPage } from './components/CakenicLandingPage';
@@ -95,12 +95,30 @@ const StoreFront: React.FC<{
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
-  const groupedProducts = products.reduce((acc, product) => {
-    const collection = getProductGroup(product);
-    if (!acc[collection]) acc[collection] = [];
-    acc[collection].push(product);
-    return acc;
-  }, {} as Record<string, Product[]>);
+  const groupedProducts = React.useMemo(() => {
+    const rawGroups = products.reduce((acc, product) => {
+      const collection = getProductGroup(product);
+      if (!acc[collection]) acc[collection] = [];
+      acc[collection].push(product);
+      return acc;
+    }, {} as Record<string, Product[]>);
+
+    // Order collections (Blankets first, then Swaddle, then others)
+    // and sort products inside each collection to feature top designs first (not alphabetical A-Z)
+    const orderedGroups: Record<string, Product[]> = {};
+    const preferredOrder = ['Blankets', 'Swaddle'];
+    preferredOrder.forEach(key => {
+      if (rawGroups[key]) {
+        orderedGroups[key] = sortCollectionProducts(key, rawGroups[key]);
+      }
+    });
+    Object.keys(rawGroups).forEach(key => {
+      if (!preferredOrder.includes(key)) {
+        orderedGroups[key] = sortCollectionProducts(key, rawGroups[key]);
+      }
+    });
+    return orderedGroups;
+  }, [products]);
 
   // Category card preview images (Jubilee Carousel for Blanket, Whimsy Fair for Swaddle)
   const blanketCardImage = 

@@ -71,3 +71,41 @@ export const getProductSlug = (p: Product | string) => {
 
   return `${nameSlug}-${group}`;
 };
+
+export const sortCollectionProducts = (collectionName: string, prods: Product[]): Product[] => {
+  const list = [...prods];
+  const collLower = (collectionName || '').toLowerCase();
+
+  if (collLower.includes('blanket')) {
+    return list.sort((a, b) => {
+      const aName = (a.name || '').toLowerCase();
+      const bName = (b.name || '').toLowerCase();
+      const aIsJubilee = aName.includes('carousel') || aName.includes('jubilee');
+      const bIsJubilee = bName.includes('carousel') || bName.includes('jubilee');
+      if (aIsJubilee && !bIsJubilee) return -1;
+      if (!aIsJubilee && bIsJubilee) return 1;
+      return aName.localeCompare(bName);
+    });
+  }
+
+  if (collLower.includes('swaddle')) {
+    return list.sort((a, b) => {
+      const aName = (a.name || '').toLowerCase();
+      const bName = (b.name || '').toLowerCase();
+      const aIsWhimsy = aName.includes('whimsy') || aName.includes('fair');
+      const bIsWhimsy = bName.includes('whimsy') || bName.includes('fair');
+      const aIsCandy = aName.includes('candy') || aName.includes('house');
+      const bIsCandy = bName.includes('candy') || bName.includes('house');
+
+      // Whimsy Fair #1 (matches collection preview card above), Candy House #2
+      if (aIsWhimsy && !bIsWhimsy) return -1;
+      if (!aIsWhimsy && bIsWhimsy) return 1;
+      if (aIsCandy && !bIsCandy) return -1;
+      if (!aIsCandy && bIsCandy) return 1;
+
+      return aName.localeCompare(bName);
+    });
+  }
+
+  return list;
+};
