@@ -110,8 +110,10 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
           name: isLuggage 
             ? `${product.name} (${isAdult ? 'Size L' : 'Size M'})`
             : `${product.name} (${isAdult ? 'Adult' : 'Baby'})`,
-          price: isAdult ? (product.adultPrice || 108) : (product.babyPrice || 88),
-          sizeOption: selectedSize,
+          price: isAdult 
+            ? (product.adultPrice || (isLuggage ? 118 : 108)) 
+            : (product.babyPrice || (isLuggage ? 98 : 88)),
+          sizeOption: isLuggage ? (isAdult ? 'Size L' : 'Size M') : selectedSize,
           size: isLuggage 
             ? (isAdult ? (product.adultSizeDesc || 'Size L: 28" – 32" Luggage') : (product.babySizeDesc || 'Size M: 22" – 26" Luggage'))
             : (isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm'))
@@ -276,7 +278,9 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
             <div className="flex items-center gap-4 mb-8">
               <span className="font-serif text-2xl text-gray-900">
                 RM {product.hasSizes 
-                  ? (selectedSize === 'adult' ? (product.adultPrice || 108) : (product.babyPrice || 88))
+                  ? (selectedSize === 'adult' 
+                      ? (product.adultPrice || (isLuggage ? 118 : 108)) 
+                      : (product.babyPrice || (isLuggage ? 98 : 88)))
                   : product.price}
               </span>
               <div className="h-4 w-[1px] bg-gray-200"></div>
@@ -308,7 +312,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                   <span className="text-[10px] mt-1 text-gray-400 text-center">
                     {isLuggage ? (product.babySizeDesc || '22" – 26" Luggage') : (product.babySizeDesc || '70 cm × 100 cm')}
                   </span>
-                  <span className="text-xs font-bold mt-2">RM {product.babyPrice || 88}</span>
+                  <span className="text-xs font-bold mt-2">RM {product.babyPrice || (isLuggage ? 98 : 88)}</span>
                 </button>
                 <button
                   onClick={() => setSelectedSize('adult')}
@@ -318,7 +322,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                   <span className="text-[10px] mt-1 text-gray-400 text-center">
                     {isLuggage ? (product.adultSizeDesc || '28" – 32" Luggage') : (product.adultSizeDesc || '150 cm × 100 cm')}
                   </span>
-                  <span className="text-xs font-bold mt-2">RM {product.adultPrice || 108}</span>
+                  <span className="text-xs font-bold mt-2">RM {product.adultPrice || (isLuggage ? 118 : 108)}</span>
                 </button>
               </div>
               {isLuggage && (

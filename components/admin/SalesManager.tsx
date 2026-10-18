@@ -102,33 +102,52 @@ const getKLDateFromIso = (isoString: string) => {
 export const getMatchedProduct = (item: { id?: string; baseProductId?: string; name?: string }, products?: Product[]): Product | null => {
   if (!products || !products.length) return null;
 
+  const isLuggageItem = Boolean(
+    (item as any).productType === 'luggage-cover' ||
+    (item as any).collection?.toLowerCase().includes('luggage') ||
+    (item as any).category?.toLowerCase().includes('luggage') ||
+    (item.name && (item.name.toLowerCase().includes('luggage') || item.name.includes('(Size M)') || item.name.includes('(Size L)')))
+  );
+
+  // 1. Match by baseProductId
   if (item.baseProductId) {
     const matched = products.find(p => p.id === item.baseProductId);
     if (matched) return matched;
   }
 
+  // 2. Match by exact ID or ID prefix
   if (item.id) {
     const matched = products.find(p => p.id === item.id);
     if (matched) return matched;
+
+    const baseId = item.id.replace(/-(baby|adult|size-m|size-l|sizem|sizel)$/i, '');
+    const matchedBase = products.find(p => p.id === baseId);
+    if (matchedBase) return matchedBase;
 
     const matchedPrefix = products.find(p => p.id && (item.id!.startsWith(p.id) || item.id!.includes(p.id)));
     if (matchedPrefix) return matchedPrefix;
   }
 
+  // 3. Name matching, prioritizing candidate products by category
   if (item.name) {
     const rawName = item.name.trim();
     const lowerRaw = rawName.toLowerCase();
     
-    const exactName = products.find(p => p.name.trim().toLowerCase() === lowerRaw);
+    // If it's a luggage item, prioritize finding within luggage covers first
+    const candidateProducts = isLuggageItem
+      ? [...products.filter(p => (p.collection && p.collection.toLowerCase().includes('luggage')) || p.productType === 'luggage-cover'), ...products]
+      : products;
+
+    const exactName = candidateProducts.find(p => p.name.trim().toLowerCase() === lowerRaw);
     if (exactName) return exactName;
 
-    const cleanItemName = lowerRaw.replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim();
-    const cleanMatched = products.find(p => p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim() === cleanItemName);
+    const cleanItemName = lowerRaw.replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order|size\s*[ml])\)/gi, '').trim();
+    const cleanMatched = candidateProducts.find(p => p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order|size\s*[ml])\)/gi, '').trim() === cleanItemName);
     if (cleanMatched) return cleanMatched;
 
     if (cleanItemName.length >= 3) {
-      const partial = products.find(p => {
-        const pClean = p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order)\)/gi, '').trim();
+      const partial = candidateProducts.find(p => {
+        const pClean = p.name.trim().toLowerCase().replace(/\s*\((baby|adult|swaddle|ticket|cakenic|pre-order|size\s*[ml])\)/gi, '').trim();
         return pClean.includes(cleanItemName) || cleanItemName.includes(pClean);
       });
       if (partial) return partial;
@@ -138,7 +157,25 @@ export const getMatchedProduct = (item: { id?: string; baseProductId?: string; n
   return null;
 };
 
-export const getItemDisplayName = (item: { name: string; sizeOption?: string; id?: string; baseProductId?: string }, products?: Product[]): string => {
+export const getItemDisplayName = (item: { name: string; sizeOption?: string; id?: string; baseProductId?: string; collection?: string; category?: string; productType?: string }, products?: Product[]): string => {
+  const isLuggageItem = Boolean(
+    (item as any).productType === 'luggage-cover' ||
+    item.collection?.toLowerCase().includes('luggage') ||
+    item.category?.toLowerCase().includes('luggage') ||
+    (item.name && (item.name.toLowerCase().includes('luggage') || item.name.includes('(Size M)') || item.name.includes('(Size L)')))
+  );
+
+  // LUGGAGE COVERS: Always display as (Size M) or (Size L), NEVER (baby) or (adult)!
+  if (isLuggageItem) {
+    if (item.name.includes('(Size M)') || item.name.includes('(Size L)')) {
+      return item.name;
+    }
+    const matched = getMatchedProduct(item, products);
+    const baseName = matched ? matched.name : item.name.replace(/\s*\((baby|adult|swaddle|pre-order|size\s*[ml])\)/gi, '').trim();
+    const isSizeL = item.sizeOption === 'adult' || item.sizeOption === 'Size L' || item.name.toLowerCase().includes('size l');
+    return `${baseName} (${isSizeL ? 'Size L' : 'Size M'})`;
+  }
+
   const matched = getMatchedProduct(item, products);
   if (!matched) return item.name;
 
@@ -156,12 +193,14 @@ export const getItemDisplayName = (item: { name: string; sizeOption?: string; id
   return matched.name;
 };
 
-export const getItemDisplayImage = (item: { image: string; id?: string; baseProductId?: string; name?: string }, products?: Product[]): string => {
+export const getItemDisplayImage = (item: { image: string; id?: string; baseProductId?: string; name?: string; collection?: string; category?: string; productType?: string }, products?: Product[]): string => {
+  if (item.image) return item.image;
   const matched = getMatchedProduct(item, products);
+  return matched?.image || '';
   return matched?.image || item.image || '';
 };
 
-const getNormalizedProductInfo = (item: { id?: string; baseProductId?: string; name: string; collection?: string; category?: string; isCheckoutAddon?: boolean }, products?: Product[]) => {
+const getNormalizedProductInfo = (item: { id?: string; baseProductId?: string; name: string; collection?: string; category?: string; isCheckoutAddon?: boolean; productType?: string; sizeOption?: string }, products?: Product[]) => {
   const matched = getMatchedProduct(item, products);
   const nameToUse = matched ? matched.name : item.name;
   const collectionToUse = matched?.collection || item.collection || '';
@@ -190,11 +229,35 @@ const getNormalizedProductInfo = (item: { id?: string; baseProductId?: string; n
     };
   }
 
+  // Determine if it is a luggage cover
+  const isLuggage = Boolean(
+    collectionToUse.toLowerCase().includes('luggage') ||
+    categoryToUse.toLowerCase().includes('luggage') ||
+    (item as any).productType === 'luggage-cover' ||
+    (matched as any)?.productType === 'luggage-cover' ||
+    name.toLowerCase().includes('luggage') ||
+    item.name.includes('(Size M)') ||
+    item.name.includes('(Size L)')
+  );
+
+  if (isLuggage) {
+    const isSizeL = item.name.includes('(Size L)') || (item as any).sizeOption === 'adult' || (item as any).sizeOption === 'Size L';
+    const cleanName = (matched ? matched.name : item.name).replace(/\s*\((Size\s*[ML]|adult|baby)\)/gi, '').trim();
+    const sizeLabel = isSizeL ? 'Size L' : 'Size M';
+    return {
+      key: `${cleanName}|${sizeLabel}|Luggage Cover`,
+      displayLabel: `${cleanName} (${sizeLabel})`,
+      group: 'luggage'
+    };
+  }
+
   // Determine if it is a blanket
-  const isBlanket = collectionToUse === 'Blankets' || 
-                    collectionToUse.toLowerCase().includes('blanket') ||
-                    categoryToUse.toLowerCase().includes('blanket') ||
-                    (!collectionToUse && !categoryToUse && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle') || name.toLowerCase().includes('flight')));
+  const isBlanket = !isLuggage && (
+    collectionToUse === 'Blankets' || 
+    collectionToUse.toLowerCase().includes('blanket') ||
+    categoryToUse.toLowerCase().includes('blanket') ||
+    (!collectionToUse && !categoryToUse && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle')))
+  );
 
   if (isBlanket) {
     if (name.includes('(Adult)')) {
@@ -582,8 +645,8 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
       }
     });
     return Array.from(itemsMap.values()).sort((a, b) => {
-      const weightA = a.group === 'swaddle' ? 1 : a.group === 'blanket' ? 2 : 3;
-      const weightB = b.group === 'swaddle' ? 1 : b.group === 'blanket' ? 2 : 3;
+      const weightA = a.group === 'swaddle' ? 1 : a.group === 'blanket' ? 2 : a.group === 'luggage' ? 3 : 4;
+      const weightB = b.group === 'swaddle' ? 1 : b.group === 'blanket' ? 2 : b.group === 'luggage' ? 3 : 4;
       if (weightA !== weightB) {
         return weightA - weightB;
       }
@@ -1273,8 +1336,14 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
               ${order.items.map(item => {
                 const isAddon = Boolean(item.isCheckoutAddon);
                 const isCakenicTicket = item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
-                const isBlanket = !isCakenicTicket && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
-                const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
+                const isLuggage = Boolean(
+                  (item.collection && item.collection.toLowerCase().includes('luggage')) ||
+                  (item.category && item.category.toLowerCase().includes('luggage')) ||
+                  item.productType === 'luggage-cover' ||
+                  (item.name && (item.name.toLowerCase().includes('luggage') || item.name.includes('(Size M)') || item.name.includes('(Size L)')))
+                );
+                const isBlanket = !isCakenicTicket && !isLuggage && (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket')));
+                const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isLuggage ? 'Luggage Cover' : (isBlanket ? 'Blanket' : 'Swaddle')));
                 return `
                   <tr>
                     <td>
@@ -2046,8 +2115,18 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                     const displayName = getItemDisplayName(i, products);
                                     const isAddon = matched ? (Boolean(matched.isCheckoutAddon) || matched.category === 'Add-on') : Boolean(i.isCheckoutAddon);
                                     const isCakenicTicket = (matched?.collection === 'Cakenic Ticket' || matched?.collection === 'Event' || matched?.category === 'Event Ticket' || Boolean(matched?.isCakenicOnly)) || i.collection === 'Cakenic Ticket' || i.collection === 'Event' || i.category === 'Event Ticket' || Boolean(i.isCakenicOnly) || (i.id && (i.id.includes('cakenic') || i.id.includes('ticket')));
-                                    const isBlanket = !isCakenicTicket && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket'))));
-                                    const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
+                                    const isLuggage = Boolean(
+                                        (matched?.collection && matched.collection.toLowerCase().includes('luggage')) ||
+                                        (matched?.category && matched.category.toLowerCase().includes('luggage')) ||
+                                        (matched?.productType === 'luggage-cover') ||
+                                        (i.collection && i.collection.toLowerCase().includes('luggage')) ||
+                                        (i.category && i.category.toLowerCase().includes('luggage')) ||
+                                        (i.productType === 'luggage-cover') ||
+                                        (i.name && (i.name.toLowerCase().includes('luggage') || i.name.includes('(Size M)') || i.name.includes('(Size L)'))) ||
+                                        (matched?.name && (matched.name.toLowerCase().includes('luggage') || matched.name.includes('(Size M)') || matched.name.includes('(Size L)')))
+                                    );
+                                    const isBlanket = !isCakenicTicket && !isLuggage && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!i.collection || i.collection === 'Blankets' || i.collection.toLowerCase().includes('blanket') || (i.category && i.category.toLowerCase().includes('blanket'))));
+                                    const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isLuggage ? 'Luggage Cover' : (isBlanket ? 'Blanket' : 'Swaddle')));
                                     return (
                                         <div key={i.id} className="mb-1.5 flex items-center gap-1 flex-wrap">
                                             <span>{i.quantity}x {displayName}</span>
@@ -2065,9 +2144,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                                     ? 'bg-gray-100 text-gray-500 border-gray-200' 
                                                     : isCakenicTicket
                                                         ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
-                                                        : isBlanket 
-                                                            ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                                                            : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                                                        : isLuggage
+                                                            ? 'bg-amber-100 text-amber-900 border-amber-300 font-extrabold'
+                                                            : isBlanket 
+                                                                ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                                                : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                                             }`}>
                                                 {itemCollection}
                                             </span>
@@ -2158,8 +2239,18 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                         const displayImage = getItemDisplayImage(item, products);
                                         const isAddon = matched ? (Boolean(matched.isCheckoutAddon) || matched.category === 'Add-on') : Boolean(item.isCheckoutAddon);
                                         const isCakenicTicket = (matched?.collection === 'Cakenic Ticket' || matched?.collection === 'Event' || matched?.category === 'Event Ticket' || Boolean(matched?.isCakenicOnly)) || item.collection === 'Cakenic Ticket' || item.collection === 'Event' || item.category === 'Event Ticket' || Boolean(item.isCakenicOnly) || (item.id && (item.id.includes('cakenic') || item.id.includes('ticket')));
-                                        const isBlanket = !isCakenicTicket && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'))));
-                                        const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
+                                        const isLuggage = Boolean(
+                                            (matched?.collection && matched.collection.toLowerCase().includes('luggage')) ||
+                                            (matched?.category && matched.category.toLowerCase().includes('luggage')) ||
+                                            (matched?.productType === 'luggage-cover') ||
+                                            (item.collection && item.collection.toLowerCase().includes('luggage')) ||
+                                            (item.category && item.category.toLowerCase().includes('luggage')) ||
+                                            (item.productType === 'luggage-cover') ||
+                                            (item.name && (item.name.toLowerCase().includes('luggage') || item.name.includes('(Size M)') || item.name.includes('(Size L)'))) ||
+                                            (matched?.name && (matched.name.toLowerCase().includes('luggage') || matched.name.includes('(Size M)') || matched.name.includes('(Size L)')))
+                                        );
+                                        const isBlanket = !isCakenicTicket && !isLuggage && (matched ? (matched.collection === 'Blankets' || matched.collection?.toLowerCase().includes('blanket') || matched.category?.toLowerCase().includes('blanket')) : (!item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'))));
+                                        const itemCollection = isCakenicTicket ? 'Event' : (isAddon ? 'Add-on' : (isLuggage ? 'Luggage Cover' : (isBlanket ? 'Blanket' : 'Swaddle')));
                                         return (
                                             <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-[2px] border border-brand-latte/20">
                                                 <img src={displayImage} className="w-12 h-16 object-cover bg-gray-100" />
@@ -2170,9 +2261,11 @@ export const SalesManager: React.FC<SalesManagerProps> = ({ orders, products }) 
                                                             ? 'bg-gray-100 text-gray-500 border-gray-200' 
                                                             : isCakenicTicket
                                                                 ? 'bg-rose-100 text-rose-800 border-rose-300 font-extrabold'
-                                                                : isBlanket 
-                                                                    ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                                                                    : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
+                                                                : isLuggage
+                                                                    ? 'bg-amber-100 text-amber-900 border-amber-300 font-extrabold'
+                                                                    : isBlanket 
+                                                                        ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
+                                                                        : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
                                                     }`}>
                                                         {itemCollection}
                                                     </span>

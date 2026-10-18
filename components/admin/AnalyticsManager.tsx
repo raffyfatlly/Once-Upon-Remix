@@ -56,11 +56,34 @@ const getNormalizedProductInfo = (item: { name: string; collection?: string; cat
     };
   }
 
+  // Determine if it is a luggage cover
+  const isLuggage = Boolean(
+    collection.toLowerCase().includes('luggage') ||
+    category.toLowerCase().includes('luggage') ||
+    (item as any).productType === 'luggage-cover' ||
+    name.toLowerCase().includes('luggage') ||
+    item.name.includes('(Size M)') ||
+    item.name.includes('(Size L)')
+  );
+
+  if (isLuggage) {
+    const isSizeL = item.name.includes('(Size L)') || (item as any).sizeOption === 'adult' || (item as any).sizeOption === 'Size L';
+    const cleanName = item.name.replace(/\s*\((Size\s*[ML]|adult|baby)\)/gi, '').trim();
+    const sizeLabel = isSizeL ? 'Size L' : 'Size M';
+    return {
+      key: `${cleanName}|${sizeLabel}|Luggage Cover`,
+      displayLabel: `${cleanName} (${sizeLabel})`,
+      group: 'luggage'
+    };
+  }
+
   // Determine if it is a blanket
-  const isBlanket = collection === 'Blankets' || 
-                    collection.toLowerCase().includes('blanket') ||
-                    category.toLowerCase().includes('blanket') ||
-                    (!collection && !category && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle') || name.toLowerCase().includes('flight')));
+  const isBlanket = !isLuggage && (
+    collection === 'Blankets' || 
+    collection.toLowerCase().includes('blanket') ||
+    category.toLowerCase().includes('blanket') ||
+    (!collection && !category && (name.toLowerCase().includes('blanket') || name.toLowerCase().includes('castle')))
+  );
 
   if (isBlanket) {
     if (name.includes('(Adult)')) {
@@ -243,8 +266,8 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
       }
     });
     return Array.from(itemsMap.values()).sort((a, b) => {
-      const weightA = a.group === 'swaddle' ? 1 : a.group === 'blanket' ? 2 : 3;
-      const weightB = b.group === 'swaddle' ? 1 : b.group === 'blanket' ? 2 : 3;
+      const weightA = a.group === 'swaddle' ? 1 : a.group === 'blanket' ? 2 : a.group === 'luggage' ? 3 : 4;
+      const weightB = b.group === 'swaddle' ? 1 : b.group === 'blanket' ? 2 : b.group === 'luggage' ? 3 : 4;
       if (weightA !== weightB) {
         return weightA - weightB;
       }
@@ -650,6 +673,16 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
                     <button
                       type="button"
                       onClick={() => {
+                        const luggage = availableProducts.filter(p => p.group === 'luggage').map(p => p.key);
+                        setSelectedProducts(luggage);
+                      }}
+                      className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-[2px] transition-colors"
+                    >
+                      Luggage
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         const addons = availableProducts.filter(p => p.group === 'other').map(p => p.key);
                         setSelectedProducts(addons);
                       }}
@@ -689,9 +722,10 @@ export const AnalyticsManager: React.FC<AnalyticsManagerProps> = ({ orders }) =>
                           <span className={`text-[9px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded-[2px] ${
                             prod.group === 'swaddle' ? 'bg-[#3D5A80]/10 text-[#3D5A80]' :
                             prod.group === 'blanket' ? 'bg-[#E07A5F]/10 text-[#E07A5F]' :
+                            prod.group === 'luggage' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                             'bg-gray-100 text-gray-500'
                           }`}>
-                            {prod.group}
+                            {prod.group === 'luggage' ? 'Luggage Cover' : prod.group}
                           </span>
                         </label>
                       );

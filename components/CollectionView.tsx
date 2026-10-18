@@ -119,7 +119,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                     <p className="text-[11px] text-gray-500 font-sans leading-tight">
                       Approx 58–63 cm (H) × 39–42 cm (W) × 23–27 cm (D)
                     </p>
-                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 88</span>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 98</span>
                   </div>
 
                   <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl border border-brand-latte/20 shadow-xs">
@@ -130,7 +130,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                     <p className="text-[11px] text-gray-500 font-sans leading-tight">
                       Approx 65–70 cm (H) × 47–50 cm (W) × 26–30 cm (D)
                     </p>
-                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 108</span>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 118</span>
                   </div>
                 </div>
               </div>

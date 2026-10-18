@@ -799,7 +799,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const handleAddSizedProductToCart = (product: Product, size: 'baby' | 'adult') => {
     const isAdult = size === 'adult';
     const isLuggage = isLuggageCoverProduct(product);
-    const finalPrice = isAdult ? (product.adultPrice || 108) : (product.babyPrice || 88);
+    const finalPrice = isAdult 
+      ? (product.adultPrice || (isLuggage ? 118 : 108)) 
+      : (product.babyPrice || (isLuggage ? 98 : 88));
     const finalSizeDesc = isLuggage 
       ? (isAdult ? (product.adultSizeDesc || 'Size L: 28" – 32" Luggage') : (product.babySizeDesc || 'Size M: 22" – 26" Luggage'))
       : (isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm'));
@@ -1837,7 +1839,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                     {selectedSizeProduct.babySizeDesc || (isLuggageCoverProduct(selectedSizeProduct) ? 'Size M: 22" – 26"' : '70 cm × 100 cm')}
                   </span>
                 </div>
-                <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">RM {selectedSizeProduct.babyPrice || 88}</div>
+                <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">
+                  RM {selectedSizeProduct.babyPrice || (isLuggageCoverProduct(selectedSizeProduct) ? 98 : 88)}
+                </div>
               </button>
 
               {/* Option 2: Adult or Size L */}
@@ -1853,7 +1857,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                     {selectedSizeProduct.adultSizeDesc || (isLuggageCoverProduct(selectedSizeProduct) ? 'Size L: 28" – 32"' : '150 cm × 100 cm')}
                   </span>
                 </div>
-                <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">RM {selectedSizeProduct.adultPrice || 108}</div>
+                <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">
+                  RM {selectedSizeProduct.adultPrice || (isLuggageCoverProduct(selectedSizeProduct) ? 118 : 108)}
+                </div>
               </button>
             </div>
             

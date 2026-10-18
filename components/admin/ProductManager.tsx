@@ -233,7 +233,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
   const [formData, setFormData] = useState<Product>({
     id: '',
     name: '',
-    price: 88,
+    price: 98,
     description: '',
     image: '',
     additionalImages: [],
@@ -245,8 +245,8 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     size: 'Size M: 22"–26" / Size L: 28"–32"',
     stock: 0,
     hasSizes: true,
-    babyPrice: 88,
-    adultPrice: 108,
+    babyPrice: 98,
+    adultPrice: 118,
     babySizeDesc: 'Size M: 22" – 26" Luggage',
     adultSizeDesc: 'Size L: 28" – 32" Luggage',
     isCheckoutAddon: false,
@@ -267,9 +267,9 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         category: 'Luggage Cover',
         productType: 'luggage-cover',
         hasSizes: true,
-        price: 88,
-        babyPrice: 88,
-        adultPrice: 108,
+        price: 98,
+        babyPrice: 98,
+        adultPrice: 118,
         babySizeDesc: 'Size M: 22" – 26" Luggage',
         adultSizeDesc: 'Size L: 28" – 32" Luggage',
         size: 'Size M: 22"–26" / Size L: 28"–32"',
@@ -371,7 +371,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     setFormData({
       id: '',
       name: '',
-      price: isLuggage ? 88 : 185,
+      price: isLuggage ? 98 : 185,
       description: '',
       image: '',
       additionalImages: [],
@@ -387,8 +387,8 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
       size: isLuggage ? 'Size M: 22"–26" / Size L: 28"–32"' : '',
       stock: 0,
       hasSizes: isLuggage,
-      babyPrice: isLuggage ? 88 : 185,
-      adultPrice: isLuggage ? 108 : 225,
+      babyPrice: isLuggage ? 98 : 185,
+      adultPrice: isLuggage ? 118 : 225,
       babySizeDesc: isLuggage ? 'Size M: 22" – 26" Luggage' : '70 cm x 100 cm',
       adultSizeDesc: isLuggage ? 'Size L: 28" – 32" Luggage' : '150 cm x 100 cm',
       isCheckoutAddon: false,
@@ -443,12 +443,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         productType: 'luggage-cover',
         collection: 'Luggage Cover',
         category: 'Luggage Cover',
-        price: 88,
+        price: 98,
         stock: 50,
         badge: 'Pre-Order',
         hasSizes: true,
-        babyPrice: 88,
-        adultPrice: 108,
+        babyPrice: 98,
+        adultPrice: 118,
         babySizeDesc: 'Size M: 22" – 26" Luggage',
         adultSizeDesc: 'Size L: 28" – 32" Luggage',
         size: 'Size M: 22"–26" / Size L: 28"–32"',
@@ -466,12 +466,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         productType: 'luggage-cover',
         collection: 'Luggage Cover',
         category: 'Luggage Cover',
-        price: 88,
+        price: 98,
         stock: 50,
         badge: 'Pre-Order',
         hasSizes: true,
-        babyPrice: 88,
-        adultPrice: 108,
+        babyPrice: 98,
+        adultPrice: 118,
         babySizeDesc: 'Size M: 22" – 26" Luggage',
         adultSizeDesc: 'Size L: 28" – 32" Luggage',
         size: 'Size M: 22"–26" / Size L: 28"–32"',
@@ -489,12 +489,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         productType: 'luggage-cover',
         collection: 'Luggage Cover',
         category: 'Luggage Cover',
-        price: 88,
+        price: 98,
         stock: 50,
         badge: 'Pre-Order',
         hasSizes: true,
-        babyPrice: 88,
-        adultPrice: 108,
+        babyPrice: 98,
+        adultPrice: 118,
         babySizeDesc: 'Size M: 22" – 26" Luggage',
         adultSizeDesc: 'Size L: 28" – 32" Luggage',
         size: 'Size M: 22"–26" / Size L: 28"–32"',
@@ -512,12 +512,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         productType: 'luggage-cover',
         collection: 'Luggage Cover',
         category: 'Luggage Cover',
-        price: 88,
+        price: 98,
         stock: 50,
         badge: 'Pre-Order',
         hasSizes: true,
-        babyPrice: 88,
-        adultPrice: 108,
+        babyPrice: 98,
+        adultPrice: 118,
         babySizeDesc: 'Size M: 22" – 26" Luggage',
         adultSizeDesc: 'Size L: 28" – 32" Luggage',
         size: 'Size M: 22"–26" / Size L: 28"–32"',
@@ -696,19 +696,19 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
   const isCurrentFormLuggage = formData.collection?.toLowerCase().includes('luggage') || formData.productType === 'luggage-cover';
 
   return (
-    <>
+    <div className="w-full max-w-full min-w-0">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 w-full min-w-0">
         <div>
           <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Product Management</h2>
           <p className="text-xs text-gray-500 mt-1">
             Organize catalog, distinguish blankets & luggage cover design collections, manage sizes and stock.
           </p>
         </div>
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <button 
             onClick={() => handleCreate(selectedCollectionFilter === 'all' ? 'Luggage Cover' : selectedCollectionFilter)}
-            className="w-full md:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded-[2px] shadow-sm"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded-[2px] shadow-sm"
           >
             <Plus size={14} /> Add Product
           </button>
@@ -717,7 +717,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
 
       {isEditing ? (
         /* Edit / Create Form View */
-        <div className="bg-white p-6 md:p-8 border border-brand-latte/20 shadow-sm animate-fade-in max-w-3xl mx-auto rounded-[2px]">
+        <div className="bg-white p-4 sm:p-6 md:p-8 border border-brand-latte/20 shadow-sm animate-fade-in max-w-3xl mx-auto rounded-[2px] w-full min-w-0">
           <div className="flex items-center justify-between border-b border-brand-latte/20 pb-4 mb-6">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Product Editor</span>
@@ -1115,8 +1115,8 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
             <div>
               <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Main Product Image</label>
               <div className="flex flex-col gap-4">
-                <div className="flex gap-2 items-center">
-                  <div className="relative flex-1">
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full min-w-0">
+                  <div className="relative flex-1 min-w-0">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                       <LinkIcon size={14} />
                     </div>
@@ -1137,12 +1137,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                     )}
                   </div>
                   
-                  <span className="text-[10px] text-gray-400 font-bold uppercase mx-1">OR</span>
+                  <span className="text-[10px] text-gray-400 font-bold uppercase text-center sm:mx-1">OR</span>
                   
                   <button 
                     type="button"
                     onClick={() => productFileInputRef.current?.click()}
-                    className="bg-white border border-brand-latte/30 text-gray-600 hover:text-brand-flamingo hover:border-brand-flamingo px-4 py-3 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider min-w-[100px] justify-center"
+                    className="bg-white border border-brand-latte/30 text-gray-600 hover:text-brand-flamingo hover:border-brand-flamingo px-4 py-3 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider justify-center w-full sm:w-auto sm:min-w-[100px]"
                     title="Upload Photo"
                     disabled={saveStatus === 'uploading'}
                   >
@@ -1214,8 +1214,8 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                 </div>
               </div>
 
-              <div className="flex gap-2 items-center">
-                <div className="relative flex-1">
+              <div className="flex gap-2 items-center w-full min-w-0">
+                <div className="relative flex-1 min-w-0">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><LinkIcon size={14} /></div>
                   <input 
                     className="w-full border p-2 pl-9 pr-4 text-xs focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono" 
@@ -1260,12 +1260,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         </div>
       ) : (
         /* Main Catalog View with Filters */
-        <div className="space-y-6">
+        <div className="space-y-6 w-full max-w-full min-w-0">
           {/* SEARCH & FILTERS BAR */}
-          <div className="bg-white p-4 md:p-5 border border-brand-latte/20 rounded shadow-sm space-y-4">
+          <div className="bg-white p-3.5 sm:p-5 border border-brand-latte/20 rounded shadow-sm space-y-4 w-full max-w-full min-w-0 overflow-hidden">
             {/* Top row: Search & Status Filter */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full min-w-0">
+              <div className="relative flex-1 min-w-0">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input 
                   type="text" 
@@ -1285,11 +1285,11 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
               </div>
 
               {/* Status Toggle */}
-              <div className="flex items-center gap-1.5 self-end sm:self-auto bg-brand-grey/10 p-1 rounded border border-brand-latte/20">
+              <div className="flex items-center justify-between sm:justify-start gap-1 bg-brand-grey/10 p-1 rounded border border-brand-latte/20 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors text-center ${
                     statusFilter === 'all' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
@@ -1298,7 +1298,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                 <button
                   type="button"
                   onClick={() => setStatusFilter('live')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1 ${
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors flex items-center justify-center gap-1 ${
                     statusFilter === 'live' ? 'bg-green-600 text-white shadow-xs' : 'text-gray-500 hover:text-green-700'
                   }`}
                 >
@@ -1308,7 +1308,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                 <button
                   type="button"
                   onClick={() => setStatusFilter('hidden')}
-                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+                  className={`flex-1 sm:flex-initial px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded transition-colors text-center ${
                     statusFilter === 'hidden' ? 'bg-gray-800 text-white shadow-xs' : 'text-gray-500 hover:text-gray-900'
                   }`}
                 >
@@ -1318,13 +1318,13 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
             </div>
 
             {/* Bottom row: Collection Filter Pills */}
-            <div className="border-t border-brand-latte/15 pt-3">
+            <div className="border-t border-brand-latte/15 pt-3 w-full max-w-full min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <Filter size={12} className="text-brand-gold" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Filter By Collection:</span>
               </div>
 
-              <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+              <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1.5 w-full max-w-full min-w-0 touch-pan-x">
                 {/* All Collections */}
                 <button
                   type="button"
@@ -1477,11 +1477,11 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
           </div>
 
           {/* PRODUCTS GRID */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 md:gap-6 w-full min-w-0">
             {safeProducts.length === 0 && (
-              <div className="col-span-full text-center p-12 text-gray-400 italic flex flex-col items-center">
+              <div className="col-span-full text-center p-8 sm:p-12 text-gray-400 italic flex flex-col items-center w-full min-w-0">
                 <p className="mb-4">No products found in database.</p>
-                <div className="p-6 bg-white border border-dashed border-brand-latte/50 rounded flex flex-col items-center max-w-md">
+                <div className="p-6 bg-white border border-dashed border-brand-latte/50 rounded flex flex-col items-center max-w-md w-full">
                   <Database className="text-brand-flamingo mb-3" size={32} strokeWidth={1} />
                   <h4 className="font-serif text-lg text-gray-900 mb-2">Initialize Database?</h4>
                   <p className="text-xs text-gray-500 mb-4 text-center">
@@ -1500,13 +1500,13 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
             )}
 
             {safeProducts.length > 0 && filteredProducts.length === 0 && (
-              <div className="col-span-full bg-white border border-dashed border-brand-latte/40 p-12 text-center rounded flex flex-col items-center justify-center">
+              <div className="col-span-full bg-white border border-dashed border-brand-latte/40 p-8 sm:p-12 text-center rounded flex flex-col items-center justify-center w-full min-w-0">
                 <Layers size={36} className="text-gray-300 mb-3" />
                 <h4 className="font-serif text-lg text-gray-900 mb-1">No products found</h4>
                 <p className="text-xs text-gray-500 mb-4 max-w-sm">
                   No products matched your selected collection &ldquo;{selectedCollectionFilter}&rdquo; or search query.
                 </p>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap justify-center">
                   <button
                     onClick={() => {
                       setSelectedCollectionFilter('all');
@@ -1535,12 +1535,12 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
               return (
                 <div 
                   key={product.id} 
-                  className={`bg-white border rounded shadow-xs p-4 flex gap-4 items-start group transition-all duration-200 hover:shadow-md ${
+                  className={`bg-white border rounded shadow-xs p-3.5 sm:p-4 flex gap-3 sm:gap-4 items-start group transition-all duration-200 hover:shadow-md w-full min-w-0 ${
                     isLuggage ? 'border-amber-200/80 hover:border-amber-400' : 'border-brand-latte/20 hover:border-brand-latte/50'
                   }`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative w-18 h-24 shrink-0 rounded overflow-hidden bg-gray-100 border border-brand-latte/20">
+                  <div className="relative w-16 sm:w-20 h-24 shrink-0 rounded overflow-hidden bg-gray-100 border border-brand-latte/20">
                     <img 
                       src={product.image || '/luggage_cover_preview.jpg'} 
                       alt={product.name} 
@@ -1557,7 +1557,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                   </div>
 
                   {/* Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     {/* Collection badge & Status */}
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       <span className={`text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wider border flex items-center gap-1 ${badge.style}`}>
@@ -1579,7 +1579,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                     </div>
 
                     {/* Title */}
-                    <h4 className="font-serif text-base text-gray-900 font-semibold leading-snug truncate" title={product.name}>
+                    <h4 className="font-serif text-sm sm:text-base text-gray-900 font-semibold leading-snug truncate" title={product.name}>
                       {product.name}
                     </h4>
 
@@ -1598,19 +1598,19 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                     )}
 
                     {/* Pricing & Sizing summary */}
-                    <div className="mt-2 pt-2 border-t border-brand-latte/15 flex flex-col">
-                      <div className="flex items-baseline justify-between gap-2">
+                    <div className="mt-2 pt-2 border-t border-brand-latte/15 flex flex-col w-full min-w-0">
+                      <div className="flex items-baseline justify-between gap-1 flex-wrap">
                         {product.hasSizes ? (
                           <div className="text-xs">
-                            <span className="font-script text-base text-brand-gold font-bold">
-                              RM {product.babyPrice || product.price} – RM {product.adultPrice || 108}
+                            <span className="font-script text-base sm:text-lg text-brand-gold font-bold">
+                              RM {product.babyPrice || (isLuggage ? 98 : product.price)} – RM {product.adultPrice || (isLuggage ? 118 : 108)}
                             </span>
-                            <span className="text-[9px] text-gray-500 ml-1.5 font-sans">
-                              ({isLuggage ? 'M & L Sizes' : 'Baby & Adult'})
+                            <span className="text-[9px] text-gray-500 ml-1 font-sans">
+                              ({isLuggage ? 'M & L' : 'Baby & Adult'})
                             </span>
                           </div>
                         ) : (
-                          <span className="font-script text-base text-brand-gold font-bold">
+                          <span className="font-script text-base sm:text-lg text-brand-gold font-bold">
                             RM {product.price}
                           </span>
                         )}
@@ -1675,6 +1675,6 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 };
