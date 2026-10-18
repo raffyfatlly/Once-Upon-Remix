@@ -19,10 +19,20 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
 
   // Categories Logic
   const getProductGroup = (product: Product) => {
-    return product.category?.trim() || product.collection || 'Blankets';
+    const raw = product.category?.trim() || product.collection || 'Blankets';
+    const lower = raw.toLowerCase();
+    if (lower.includes('luggage')) return 'Luggage Cover';
+    if (lower.includes('blanket')) return 'Blankets';
+    if (lower.includes('swaddle')) return 'Swaddle';
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
-  const collections = Array.from(new Set(products.map(getProductGroup))).sort() as string[];
+  const rawCollections = Array.from(new Set(products.map(getProductGroup))) as string[];
+  const preferredNavOrder = ['Blankets', 'Swaddle', 'Luggage Cover'];
+  const collections = [
+    ...preferredNavOrder.filter(c => rawCollections.includes(c)),
+    ...rawCollections.filter(c => !preferredNavOrder.includes(c)).sort()
+  ];
   
   // Mobile accordion state
   const [expandedCollection, setExpandedCollection] = useState<string | null>(null);
@@ -97,9 +107,14 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
                        <Link 
                          key={collection}
                          to={`/collections/${encodeURIComponent(collection)}`}
-                         className="px-6 py-3 text-xs font-sans text-gray-600 hover:text-brand-flamingo hover:bg-brand-grey/10 text-left transition-colors uppercase tracking-wider"
+                         className="px-6 py-3 text-xs font-sans text-gray-600 hover:text-brand-flamingo hover:bg-brand-grey/10 text-left transition-colors uppercase tracking-wider flex items-center justify-between gap-2"
                        >
-                         {collection}
+                         <span>{collection}</span>
+                         {collection.toLowerCase().includes("luggage") && (
+                           <span className="text-[8px] font-bold bg-brand-gold/15 text-brand-gold border border-brand-gold/20 px-1.5 py-0.5 rounded-full ml-2">
+                             Pre-Order
+                           </span>
+                         )}
                        </Link>
                      ))
                    ) : (
@@ -196,15 +211,20 @@ export const Navbar: React.FC<NavbarProps> = ({ cartCount, products }) => {
                 </button>
                 
                 <div className={`overflow-hidden transition-all duration-500 ease-in-out w-full ${isCollectionsExpanded ? 'max-h-[1000px] opacity-100 mt-6' : 'max-h-0 opacity-0'}`}>
-                   <div className="flex flex-col gap-6 items-center border-l border-brand-latte/20 ml-[50%] -translate-x-1/2 pl-6">
+                   <div className="flex flex-col gap-6 items-center w-full">
                       {collections.map(collection => (
                         <div key={collection} className="flex flex-col items-center w-full">
                            <button 
                              onClick={() => setExpandedCollection(expandedCollection === collection ? null : collection)}
-                             className="font-sans text-sm font-bold uppercase tracking-widest text-gray-600 hover:text-brand-flamingo flex items-center gap-2"
+                             className="font-sans text-sm font-bold uppercase tracking-widest text-gray-600 hover:text-brand-flamingo flex items-center justify-center gap-2 group/btn"
                            >
-                             {collection}
-                             {expandedCollection === collection ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                             <span>{collection}</span>
+                             {collection.toLowerCase().includes('luggage') && (
+                               <span className="text-[8px] font-bold bg-brand-gold/15 text-brand-gold border border-brand-gold/20 px-2 py-0.5 rounded-full">
+                                 Pre-Order
+                               </span>
+                             )}
+                             {expandedCollection === collection ? <ChevronUp size={12} className="text-brand-flamingo" /> : <ChevronDown size={12} className="text-gray-400 group-hover/btn:text-brand-flamingo" />}
                            </button>
                            
                            {/* Nested Products List for Mobile */}

@@ -23,6 +23,10 @@ export interface Product {
   isLive?: boolean;
   isCakenicOnly?: boolean;
   addShippingBox?: boolean;
+  designName?: string;
+  productType?: 'blanket' | 'swaddle' | 'luggage-cover' | 'addon' | 'ticket' | 'other';
+  sku?: string;
+  noSizeReplacement?: boolean;
 }
 
 export interface CartItem extends Product {

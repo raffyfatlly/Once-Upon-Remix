@@ -54,6 +54,19 @@ export const NAVIGATION_LINKS = [
   { name: 'Collections', href: '#collections' },
 ];
 
+export const getProductGroup = (product: Product): string => {
+  if (product.productType === 'luggage-cover') return 'Luggage Cover';
+  if (product.productType === 'swaddle') return 'Swaddle';
+  if (product.productType === 'blanket') return 'Blankets';
+  
+  const raw = product.category?.trim() || product.collection || 'Blankets';
+  const lower = raw.toLowerCase();
+  if (lower.includes('luggage')) return 'Luggage Cover';
+  if (lower.includes('blanket')) return 'Blankets';
+  if (lower.includes('swaddle')) return 'Swaddle';
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
 export const getProductSlug = (p: Product | string) => {
   if (!p) return '';
   if (typeof p === 'string') {
@@ -62,10 +75,12 @@ export const getProductSlug = (p: Product | string) => {
   const nameSlug = (p.name || '').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
   if (!nameSlug) return p.id || '';
 
-  const isBlanket = (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
-  const group = isBlanket ? 'blanket' : 'swaddle';
+  const isLuggage = p.productType === 'luggage-cover' || (p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'));
+  const isBlanket = p.productType === 'blanket' || (!isLuggage && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'))));
+  const isSwaddle = p.productType === 'swaddle' || (!isLuggage && !isBlanket && ((p.collection && p.collection.toLowerCase().includes('swaddle')) || (p.category && p.category.toLowerCase().includes('swaddle'))));
+  const group = isLuggage ? 'luggage-cover' : (isBlanket ? 'blanket' : (isSwaddle ? 'swaddle' : 'item'));
 
-  if (nameSlug.endsWith('-blanket') || nameSlug.endsWith('-swaddle')) {
+  if (nameSlug.endsWith('-blanket') || nameSlug.endsWith('-swaddle') || nameSlug.endsWith('-luggage-cover')) {
     return nameSlug;
   }
 
@@ -75,6 +90,28 @@ export const getProductSlug = (p: Product | string) => {
 export const sortCollectionProducts = (collectionName: string, prods: Product[]): Product[] => {
   const list = [...prods];
   const collLower = (collectionName || '').toLowerCase();
+
+  if (collLower.includes('luggage')) {
+    return list.sort((a, b) => {
+      const aName = (a.name || '').toLowerCase();
+      const bName = (b.name || '').toLowerCase();
+      
+      const getLuggagePriority = (name: string) => {
+        // Priority order: 1. Parisian, 2. Jubilee Carousel, 3. Dream Castle, 4. Balloon Ride
+        if (name.includes('parisian') || name.includes('flight')) return 0;
+        if (name.includes('carousel') || name.includes('jubilee')) return 1;
+        if (name.includes('castle') || name.includes('dream')) return 2;
+        if (name.includes('balloon') || name.includes('whimsy')) return 3;
+        return 4;
+      };
+
+      const aP = getLuggagePriority(aName);
+      const bP = getLuggagePriority(bName);
+
+      if (aP !== bP) return aP - bP;
+      return aName.localeCompare(bName);
+    });
+  }
 
   if (collLower.includes('blanket')) {
     return list.sort((a, b) => {

@@ -645,7 +645,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   const [selectedSizeProduct, setSelectedSizeProduct] = useState<Product | null>(null);
 
   // Category selection / filter state
-  const [activeCategory, setActiveCategory] = useState<'all' | 'swaddles' | 'blankets' | 'events' | 'addons'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'swaddles' | 'blankets' | 'luggage' | 'events' | 'addons'>('all');
 
   // Mobile optimization states
   const [activeMobileTab, setActiveMobileTab] = useState<'products' | 'cart'>('products');
@@ -713,31 +713,37 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
            category.includes('card');
   };
 
+  const isLuggageCoverProduct = (p: Product | CartItem) => 
+    Boolean((p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage')) || (p as any).productType === 'luggage-cover');
+
   const isBlanketProduct = (p: Product | CartItem) => 
     !isCakenicTicketProduct(p) && 
     !isAddonProduct(p) && 
     !isPerfumeOrHairOil(p) && 
+    !isLuggageCoverProduct(p) &&
     (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
 
   const isSwaddleProduct = (p: Product | CartItem) => 
     !isCakenicTicketProduct(p) && 
     !isAddonProduct(p) && 
     !isPerfumeOrHairOil(p) && 
+    !isLuggageCoverProduct(p) &&
     !isBlanketProduct(p);
 
   const isBlanketOrSwaddle = (p: Product | CartItem) => 
     isBlanketProduct(p) || isSwaddleProduct(p);
 
-  const swaddles = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
-  const blankets = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false);
+  const swaddles = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && !isLuggageCoverProduct(p) && p.isLive !== false);
+  const blankets = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && !isLuggageCoverProduct(p) && p.isLive !== false);
 
   // Category counts
-  const swaddlesCount = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
-  const blanketsCount = products.filter(p => !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p) && p.isLive !== false).length;
+  const swaddlesCount = products.filter(p => isSwaddleProduct(p) && p.isLive !== false).length;
+  const blanketsCount = products.filter(p => isBlanketProduct(p) && p.isLive !== false).length;
+  const luggageCount = products.filter(p => isLuggageCoverProduct(p) && p.isLive !== false).length;
   const eventsCount = products.filter(p => isCakenicTicketProduct(p) && p.isLive !== false).length;
   const addonsCount = products.filter(p => !isCakenicTicketProduct(p) && (isAddonProduct(p) || isPerfumeOrHairOil(p)) && p.isLive !== false).length;
 
-  // Sort POS products: First Swaddles (0), then Blankets (1), then Events (2), then Add-ons (3)
+  // Sort POS products: First Swaddles (0), then Blankets (1), then Luggage (2), then Events (3), then Add-ons (4)
   const sortedProducts = [...products].sort((a, b) => {
     const aIsCakenic = isCakenicTicketProduct(a);
     const bIsCakenic = isCakenicTicketProduct(b);
@@ -745,11 +751,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
     const bIsPerfumeOrOil = isPerfumeOrHairOil(b);
     const aIsAddon = isAddonProduct(a);
     const bIsAddon = isAddonProduct(b);
+    const aIsLuggage = isLuggageCoverProduct(a);
+    const bIsLuggage = isLuggageCoverProduct(b);
     const aIsBlanket = isBlanketProduct(a);
     const bIsBlanket = isBlanketProduct(b);
 
-    const aGroup = aIsCakenic ? 2 : (aIsPerfumeOrOil || aIsAddon ? 3 : (aIsBlanket ? 1 : 0));
-    const bGroup = bIsCakenic ? 2 : (bIsPerfumeOrOil || bIsAddon ? 3 : (bIsBlanket ? 1 : 0));
+    const aGroup = aIsLuggage ? 2 : (aIsCakenic ? 3 : (aIsPerfumeOrOil || aIsAddon ? 4 : (aIsBlanket ? 1 : 0)));
+    const bGroup = bIsLuggage ? 2 : (bIsCakenic ? 3 : (bIsPerfumeOrOil || bIsAddon ? 4 : (bIsBlanket ? 1 : 0)));
 
     if (aGroup !== bGroup) {
       return aGroup - bGroup;
@@ -761,10 +769,13 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
   // Filter products by active category
   const displayedProducts = sortedProducts.filter(p => {
     if (activeCategory === 'swaddles') {
-      return !isCakenicTicketProduct(p) && !isAddonProduct(p) && !isBlanketProduct(p) && !isPerfumeOrHairOil(p);
+      return isSwaddleProduct(p);
     }
     if (activeCategory === 'blankets') {
-      return !isCakenicTicketProduct(p) && !isAddonProduct(p) && isBlanketProduct(p) && !isPerfumeOrHairOil(p);
+      return isBlanketProduct(p);
+    }
+    if (activeCategory === 'luggage') {
+      return isLuggageCoverProduct(p);
     }
     if (activeCategory === 'events') {
       return isCakenicTicketProduct(p);
@@ -787,9 +798,14 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
 
   const handleAddSizedProductToCart = (product: Product, size: 'baby' | 'adult') => {
     const isAdult = size === 'adult';
+    const isLuggage = isLuggageCoverProduct(product);
     const finalPrice = isAdult ? (product.adultPrice || 108) : (product.babyPrice || 88);
-    const finalSizeDesc = isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm');
-    const finalName = `${product.name} (${isAdult ? 'Adult' : 'Baby'})`;
+    const finalSizeDesc = isLuggage 
+      ? (isAdult ? (product.adultSizeDesc || 'Size L: 28" – 32" Luggage') : (product.babySizeDesc || 'Size M: 22" – 26" Luggage'))
+      : (isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm'));
+    const finalName = isLuggage 
+      ? `${product.name} (${isAdult ? 'Size L' : 'Size M'})`
+      : `${product.name} (${isAdult ? 'Adult' : 'Baby'})`;
     const itemId = `${product.id}-${size}`;
 
     setCart(prev => {
@@ -1412,7 +1428,7 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
           </div>
 
           {/* CATEGORY CARD SELECTORS */}
-          <div id="pos-category-selector" className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 md:gap-3 mb-6">
+          <div id="pos-category-selector" className="grid grid-cols-2 sm:grid-cols-6 gap-2.5 md:gap-3 mb-6">
             <button
               id="pos-cat-swaddles"
               type="button"
@@ -1441,6 +1457,21 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               <span className="text-lg mb-1">🧸</span>
               <span className="font-serif text-xs font-semibold">Blankets</span>
               <span className="text-[9px] font-mono mt-1 opacity-70 bg-brand-gold/10 text-brand-gold px-2 py-0.5 rounded-full">{blanketsCount} Designs</span>
+            </button>
+
+            <button
+              id="pos-cat-luggage"
+              type="button"
+              onClick={() => setActiveCategory('luggage')}
+              className={`p-2.5 md:p-3 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                activeCategory === 'luggage'
+                  ? 'border-amber-600 bg-amber-50 text-amber-900 shadow-sm scale-[1.02] ring-1 ring-amber-500/50'
+                  : 'border-brand-latte/20 bg-white hover:border-amber-400 text-gray-700 hover:bg-gray-50/50'
+              }`}
+            >
+              <span className="text-lg mb-1">🧳</span>
+              <span className="font-serif text-xs font-semibold">Luggage Covers</span>
+              <span className="text-[9px] font-mono mt-1 opacity-70 bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">{luggageCount} Designs</span>
             </button>
 
             <button
@@ -1493,8 +1524,9 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
             {displayedProducts.map(product => {
               const isCakenic = isCakenicTicketProduct(product);
               const isAddon = isAddonProduct(product) || isPerfumeOrHairOil(product);
+              const isLuggage = isLuggageCoverProduct(product);
               const isBlanket = isBlanketProduct(product);
-              const collectionTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
+              const collectionTag = isCakenic ? 'Event' : (isLuggage ? 'Luggage' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle')));
               return (
                 <button 
                   key={product.id} 
@@ -1508,16 +1540,18 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                   className="text-left group border border-brand-latte/20 rounded overflow-hidden hover:border-brand-flamingo transition-colors flex flex-col h-full bg-gray-50 relative cursor-pointer"
                 >
                   <div className="aspect-[4/3] bg-gray-200 relative overflow-hidden">
-                    <img src={product.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img src={product.image || '/luggage_cover_preview.jpg'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                       <span className={`text-[8px] font-sans font-bold px-1.5 py-0.5 uppercase tracking-widest rounded-sm ${
                         isCakenic
                           ? 'bg-rose-600 text-white font-extrabold'
-                          : isAddon 
-                            ? 'bg-gray-100 text-gray-600 border border-gray-200' 
-                            : isBlanket 
-                              ? 'bg-brand-gold text-white' 
-                              : 'bg-brand-flamingo text-white'
+                          : isLuggage
+                            ? 'bg-amber-600 text-white font-extrabold'
+                            : isAddon 
+                              ? 'bg-gray-100 text-gray-600 border border-gray-200' 
+                              : isBlanket 
+                                ? 'bg-brand-gold text-white' 
+                                : 'bg-brand-flamingo text-white'
                       }`}>
                         {collectionTag}
                       </span>
@@ -1779,30 +1813,45 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
               <X size={20} />
             </button>
             
-            <h3 className="font-serif text-xl text-gray-900 mb-2 font-medium">Select Size Variant</h3>
-            <p className="text-xs text-brand-gold font-script text-base mb-6">{selectedSizeProduct.name}</p>
+            <h3 className="font-serif text-xl text-gray-900 mb-1 font-medium">Select Size Variant</h3>
+            <p className="text-xs text-brand-gold font-script text-base mb-4">{selectedSizeProduct.name}</p>
+
+            {isLuggageCoverProduct(selectedSizeProduct) && (
+              <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-900 flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>Strictly No Size Replacement Policy applies to luggage covers.</span>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
-              {/* Baby size option button */}
+              {/* Option 1: Baby or Size M */}
               <button 
                 onClick={() => handleAddSizedProductToCart(selectedSizeProduct, 'baby')}
                 className="border border-brand-latte/30 hover:border-brand-flamingo p-4 rounded text-left flex flex-col justify-between hover:bg-brand-flamingo/5 transition-all cursor-pointer"
               >
                 <div>
-                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Baby Blanket</span>
-                  <span className="block font-bold text-sm text-gray-900">{selectedSizeProduct.babySizeDesc || '70 cm × 100 cm'}</span>
+                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    {isLuggageCoverProduct(selectedSizeProduct) ? '🧳 Size M Cover' : 'Baby Blanket'}
+                  </span>
+                  <span className="block font-bold text-sm text-gray-900">
+                    {selectedSizeProduct.babySizeDesc || (isLuggageCoverProduct(selectedSizeProduct) ? 'Size M: 22" – 26"' : '70 cm × 100 cm')}
+                  </span>
                 </div>
                 <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">RM {selectedSizeProduct.babyPrice || 88}</div>
               </button>
 
-              {/* Adult size option button */}
+              {/* Option 2: Adult or Size L */}
               <button 
                 onClick={() => handleAddSizedProductToCart(selectedSizeProduct, 'adult')}
                 className="border border-brand-latte/30 hover:border-brand-flamingo p-4 rounded text-left flex flex-col justify-between hover:bg-brand-flamingo/5 transition-all cursor-pointer"
               >
                 <div>
-                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Adult Blanket</span>
-                  <span className="block font-bold text-sm text-gray-900">{selectedSizeProduct.adultSizeDesc || '150 cm × 100 cm'}</span>
+                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">
+                    {isLuggageCoverProduct(selectedSizeProduct) ? '🧳 Size L Cover' : 'Adult Blanket'}
+                  </span>
+                  <span className="block font-bold text-sm text-gray-900">
+                    {selectedSizeProduct.adultSizeDesc || (isLuggageCoverProduct(selectedSizeProduct) ? 'Size L: 28" – 32"' : '150 cm × 100 cm')}
+                  </span>
                 </div>
                 <div className="mt-4 font-mono font-bold text-brand-flamingo text-sm">RM {selectedSizeProduct.adultPrice || 108}</div>
               </button>

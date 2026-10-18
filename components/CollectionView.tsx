@@ -27,15 +27,24 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
   const getProductGroup = (product: Product) => {
     const raw = product.category?.trim() || product.collection || 'Blankets';
     const lower = raw.toLowerCase();
+    if (lower.includes('luggage')) return 'Luggage Cover';
     if (lower.includes('blanket')) return 'Blankets';
     if (lower.includes('swaddle')) return 'Swaddle';
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
+  const isLuggageCollection = collectionName.toLowerCase().includes('luggage');
+
   const filteredProducts = React.useMemo(() => {
-    const list = products.filter(p => getProductGroup(p) === collectionName);
+    const list = products.filter(p => {
+      const group = getProductGroup(p);
+      if (isLuggageCollection) {
+        return group === 'Luggage Cover' || (p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'));
+      }
+      return group === collectionName;
+    });
     return sortCollectionProducts(collectionName, list);
-  }, [products, collectionName]);
+  }, [products, collectionName, isLuggageCollection]);
 
   return (
     <div className="min-h-screen bg-white pt-24 pb-20 animate-fade-in">
@@ -45,22 +54,88 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
           
           <div className="container mx-auto px-6 text-center">
             <span className="font-script text-3xl md:text-4xl text-brand-gold mb-2 block animate-fade-in">
-               Our Collection
+               {isLuggageCollection ? 'Once Upon a Traveller' : 'Our Collection'}
             </span>
             <h1 className="font-serif text-4xl md:text-6xl text-gray-900 mb-6 leading-tight tracking-tight">
                {collectionName === 'Blankets' ? (
                  <>The <span className="italic font-serif font-medium text-brand-gold">Blanket</span> Collection</>
                ) : collectionName === 'Swaddle' ? (
                  <>The <span className="italic font-serif font-medium text-brand-gold">Swaddle</span> Collection</>
+               ) : isLuggageCollection ? (
+                 <>The <span className="italic font-serif font-medium text-brand-gold">Luggage Cover</span> Collection</>
                ) : (
                  collectionName
                )}
             </h1>
+            <p className="font-serif italic text-base md:text-lg text-gray-600 max-w-xl mx-auto leading-relaxed">
+              {isLuggageCollection 
+                ? '"New Places, Same Dreams, Together. Wrap your suitcase in whimsical fairytale cover for every voyage."' 
+                : collectionName === 'Blankets'
+                ? '"Weaving stories into the softest threads. Every piece is designed to be cherished, held, and loved."'
+                : 'Curated stories and cherished gifts.'}
+            </p>
             <div className="w-16 h-[1px] bg-brand-flamingo mx-auto my-6"></div>
           </div>
        </div>
 
        <div className="container mx-auto px-6 max-w-6xl">
+          {/* Luggage Cover Size Guide & Pre-Order Info Banner */}
+          {isLuggageCollection && filteredProducts.length > 0 && (
+            <div className="mb-14 p-6 sm:p-8 bg-brand-latte/10 rounded-3xl border border-brand-latte/20 shadow-sm relative overflow-hidden text-center md:text-left">
+              <div className="absolute -top-12 -right-12 w-44 h-44 bg-gradient-to-bl from-brand-gold/15 to-transparent rounded-full pointer-events-none" />
+              
+              <div className="flex flex-col md:flex-row items-center md:items-center justify-between gap-6 relative z-10">
+                <div className="max-w-xl text-center md:text-left flex flex-col items-center md:items-start">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[9px] font-bold uppercase tracking-widest mb-3 mx-auto md:mx-0">
+                    <Sparkles size={11} />
+                    <span>Coming Soon • Pre-Order Open</span>
+                  </div>
+                  <h3 className="font-serif text-2xl text-gray-900 mb-2 text-center md:text-left">
+                    Luggage Cover Size Guide & Specs
+                  </h3>
+                  <p className="font-sans text-xs text-gray-600 leading-relaxed mb-3 text-center md:text-left">
+                    Specially crafted with high-elasticity spandex-polyester blend fabric. Double-sided vivid storybook print, dual top handle openings, side zip access, and reinforced bottom zipper with heavy-duty safety buckle.
+                  </p>
+                  
+                  <div className="p-3 bg-amber-50/90 border border-amber-300/80 rounded-2xl flex items-start gap-2.5 text-amber-950 text-xs text-left max-w-lg">
+                    <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="block text-[10.5px] uppercase tracking-wider font-bold mb-0.5 text-amber-950">
+                        ⚠️ Strictly No Size Replacement Policy
+                      </strong>
+                      <span className="text-[11px] leading-relaxed text-amber-900 block">
+                        Suitcase dimensions vary by brand. Please measure your luggage height (excluding wheels), width, and depth carefully. We <strong>do not accept size replacements or exchanges</strong>.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full md:w-auto grid grid-cols-1 sm:grid-cols-2 gap-4 flex-shrink-0">
+                  <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl border border-brand-latte/20 shadow-xs">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-serif font-bold text-gray-900 text-sm">Size M</span>
+                      <span className="text-[10px] font-bold bg-brand-flamingo/10 text-brand-flamingo px-2 py-0.5 rounded-full">22" – 26"</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 font-sans leading-tight">
+                      Approx 58–63 cm (H) × 39–42 cm (W) × 23–27 cm (D)
+                    </p>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 88</span>
+                  </div>
+
+                  <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl border border-brand-latte/20 shadow-xs">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-serif font-bold text-gray-900 text-sm">Size L</span>
+                      <span className="text-[10px] font-bold bg-brand-flamingo/10 text-brand-flamingo px-2 py-0.5 rounded-full">28" – 32"</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 font-sans leading-tight">
+                      Approx 65–70 cm (H) × 47–50 cm (W) × 26–30 cm (D)
+                    </p>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 108</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {filteredProducts.length === 0 ? collectionName === 'Swaddle' ? (
              <div className="text-center max-w-2xl mx-auto py-16 px-6 sm:px-10 bg-brand-pink/5 rounded-3xl border border-brand-latte/20 relative overflow-hidden shadow-sm animate-fade-in">
                <div className="absolute -top-12 -right-12 w-40 h-40 bg-gradient-to-bl from-brand-gold/10 to-transparent rounded-full pointer-events-none" />

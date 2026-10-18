@@ -49,15 +49,18 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
         found = products.find(p => getProductSlug(p) === slug);
       }
 
-      // 3. Match considering blanket/swaddle filter if slug specifies it
+      // 3. Match considering blanket/swaddle/luggage filter if slug specifies it
       if (!found) {
+        const wantsLuggage = slug.includes('luggage');
         const wantsBlanket = slug.includes('blanket');
         const wantsSwaddle = slug.includes('swaddle');
 
         found = products.find(p => {
-          const isBlanket = (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+          const isLuggage = (p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'));
+          const isBlanket = !isLuggage && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket')));
+          if (wantsLuggage && !isLuggage) return false;
           if (wantsBlanket && !isBlanket) return false;
-          if (wantsSwaddle && isBlanket) return false;
+          if (wantsSwaddle && (isBlanket || isLuggage)) return false;
 
           const pSlug = getProductSlug(p);
           const nameOnlySlug = getProductSlug(p.name);
@@ -97,16 +100,21 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
     if (addState !== 'idle' || !product) return;
     setAddState('loading');
     setTimeout(() => {
+      const isLuggage = (product.collection && product.collection.toLowerCase().includes('luggage')) || (product.category && product.category.toLowerCase().includes('luggage'));
       const isAdult = selectedSize === 'adult';
       
       const tailoredProduct = product.hasSizes ? { 
           ...product,
           id: `${product.id}-${selectedSize}`,
           baseProductId: product.id,
-          name: `${product.name} (${isAdult ? 'Adult' : 'Baby'})`,
+          name: isLuggage 
+            ? `${product.name} (${isAdult ? 'Size L' : 'Size M'})`
+            : `${product.name} (${isAdult ? 'Adult' : 'Baby'})`,
           price: isAdult ? (product.adultPrice || 108) : (product.babyPrice || 88),
           sizeOption: selectedSize,
-          size: isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm')
+          size: isLuggage 
+            ? (isAdult ? (product.adultSizeDesc || 'Size L: 28" – 32" Luggage') : (product.babySizeDesc || 'Size M: 22" – 26" Luggage'))
+            : (isAdult ? (product.adultSizeDesc || '150 cm x 100 cm') : (product.babySizeDesc || '70 cm x 100 cm'))
       } : {
           ...product,
           baseProductId: product.id
@@ -161,27 +169,36 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
 
   const galleryImages = [product.image, ...(product.additionalImages || [])];
   const stock = product.stock || 0;
-  const productGroup = (!product.collection || product.collection === 'Blankets' || product.collection.toLowerCase().includes('blanket') || (product.category && product.category.toLowerCase().includes('blanket'))) ? 'Blankets' : 'Swaddle';
-  const isBlanket = productGroup === 'Blankets';
+  const isLuggage = Boolean((product.collection && product.collection.toLowerCase().includes('luggage')) || (product.category && product.category.toLowerCase().includes('luggage')));
+  const isBlanket = !isLuggage && (!product.collection || product.collection === 'Blankets' || product.collection.toLowerCase().includes('blanket') || (product.category && product.category.toLowerCase().includes('blanket')));
+  const productGroup = isLuggage ? 'Luggage Cover' : (isBlanket ? 'Blankets' : 'Swaddle');
 
-  const isPreOrder = stock <= 0 && isBlanket;
-  const isSoldOut = stock <= 0 && !isBlanket;
-  const isLowStock = stock > 0 && stock <= 5;
+  const isPreOrder = isLuggage || (stock <= 0 && isBlanket) || Boolean((product as any).isPreOrder) || (product.badge || '').toLowerCase().includes('pre-order');
+  const isSoldOut = stock <= 0 && !isBlanket && !isLuggage && !isPreOrder;
+  const isLowStock = !isPreOrder && stock > 0 && stock <= 5;
   
   // If pre-order, quantity is effectively unlimited (or reasonable max), else capped by stock
   const maxQty = isPreOrder ? 100 : stock;
 
-  // Filter out any checkout addon or wellness addon products so we only recommend premium main products (swaddles or blankets)
+  // Filter out any checkout addon or wellness addon products so we only recommend premium main products (swaddles, blankets, or luggage covers)
   const isAddonProduct = (p: Product) => Boolean(p.isCheckoutAddon) || (p.name || '').toLowerCase().includes('perfume') || (p.name || '').toLowerCase().includes('hair oil') || (p.name || '').toLowerCase().includes('oil');
   const mainProducts = products.filter(p => p.isLive !== false && !isAddonProduct(p) && p.id !== product.id && getProductSlug(p) !== slug);
 
   // Dynamic image lookups for collection navigation cards
   const blanketImage = products.find(p => !isAddonProduct(p) && (!p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'))))?.image;
   const swaddleImage = products.find(p => !isAddonProduct(p) && (p.collection === 'Swaddle' || p.collection?.toLowerCase().includes('swaddle') || (p.category && p.category.toLowerCase().includes('swaddle'))))?.image;
+  const luggageImage = products.find(p => !isAddonProduct(p) && ((p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'))) && ((p.name || '').toLowerCase().includes('parisian') || (p.name || '').toLowerCase().includes('flight')) && p.image)?.image ||
+    products.find(p => !isAddonProduct(p) && ((p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'))) && p.image)?.image || 
+    '/luggage_cover_preview.jpg';
+
+  const hasLiveLuggageCovers = products.some(p => p.isLive !== false && ((p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage')) || p.productType === 'luggage-cover'));
 
   // Up to 3 related designs of the same type/category (excluding current product)
   const relatedProducts = mainProducts
     .filter(p => {
+      if (isLuggage) {
+        return (p.collection && p.collection.toLowerCase().includes('luggage')) || (p.category && p.category.toLowerCase().includes('luggage'));
+      }
       const pIsBlanket = !p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'));
       return pIsBlanket === isBlanket;
     })
@@ -263,36 +280,100 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                   : product.price}
               </span>
               <div className="h-4 w-[1px] bg-gray-200"></div>
-              <span className="font-script text-xl text-brand-gold">{(!product.collection || product.collection === 'Blankets') ? 'Blanket Collection' : product.collection}</span>
+              <span className="font-script text-xl text-brand-gold">
+                {isLuggage ? 'Luggage Cover Collection' : (!product.collection || product.collection === 'Blankets') ? 'Blanket Collection' : product.collection}
+              </span>
             </div>
             <p className="font-serif italic text-gray-600 text-base leading-relaxed mb-6 border-l-2 border-brand-flamingo pl-6">"{product.description}"</p>
 
             {/* Size Selector */}
             {product.hasSizes && (
             <div className="mb-8">
-              <span className="block font-sans text-xs font-bold uppercase tracking-widest text-gray-900 mb-4">Select Size</span>
+              <div className="flex items-center justify-between mb-3">
+                <span className="block font-sans text-xs font-bold uppercase tracking-widest text-gray-900">
+                  {isLuggage ? 'Select Luggage Cover Size' : 'Select Size'}
+                </span>
+                {isLuggage && (
+                  <span className="text-[10px] text-brand-gold font-serif italic">
+                    Fits 22" – 32" Suitcases
+                  </span>
+                )}
+              </div>
               <div className="flex gap-4">
                 <button
                   onClick={() => setSelectedSize('baby')}
-                  className={`flex flex-col items-center justify-center p-4 border rounded-[2px] transition-all duration-300 flex-1 sm:flex-none sm:w-36 ${selectedSize === 'baby' ? 'border-brand-flamingo bg-brand-flamingo/5 text-brand-flamingo' : 'border-brand-latte/30 hover:border-brand-latte text-gray-500 bg-white'}`}
+                  className={`flex flex-col items-center justify-center p-4 border rounded-[2px] transition-all duration-300 flex-1 sm:flex-none sm:w-44 ${selectedSize === 'baby' ? 'border-brand-flamingo bg-brand-flamingo/5 text-brand-flamingo' : 'border-brand-latte/30 hover:border-brand-latte text-gray-500 bg-white'}`}
                 >
-                  <span className="font-bold text-sm">Baby</span>
-                  <span className="text-[10px] mt-1 text-gray-400">{product.babySizeDesc || '70 cm × 100 cm'}</span>
+                  <span className="font-bold text-sm">{isLuggage ? 'Size M' : 'Baby'}</span>
+                  <span className="text-[10px] mt-1 text-gray-400 text-center">
+                    {isLuggage ? (product.babySizeDesc || '22" – 26" Luggage') : (product.babySizeDesc || '70 cm × 100 cm')}
+                  </span>
                   <span className="text-xs font-bold mt-2">RM {product.babyPrice || 88}</span>
                 </button>
                 <button
                   onClick={() => setSelectedSize('adult')}
-                  className={`flex flex-col items-center justify-center p-4 border rounded-[2px] transition-all duration-300 flex-1 sm:flex-none sm:w-36 ${selectedSize === 'adult' ? 'border-brand-flamingo bg-brand-flamingo/5 text-brand-flamingo' : 'border-brand-latte/30 hover:border-brand-latte text-gray-500 bg-white'}`}
+                  className={`flex flex-col items-center justify-center p-4 border rounded-[2px] transition-all duration-300 flex-1 sm:flex-none sm:w-44 ${selectedSize === 'adult' ? 'border-brand-flamingo bg-brand-flamingo/5 text-brand-flamingo' : 'border-brand-latte/30 hover:border-brand-latte text-gray-500 bg-white'}`}
                 >
-                  <span className="font-bold text-sm">Adult</span>
-                  <span className="text-[10px] mt-1 text-gray-400">{product.adultSizeDesc || '150 cm × 100 cm'}</span>
+                  <span className="font-bold text-sm">{isLuggage ? 'Size L' : 'Adult'}</span>
+                  <span className="text-[10px] mt-1 text-gray-400 text-center">
+                    {isLuggage ? (product.adultSizeDesc || '28" – 32" Luggage') : (product.adultSizeDesc || '150 cm × 100 cm')}
+                  </span>
                   <span className="text-xs font-bold mt-2">RM {product.adultPrice || 108}</span>
                 </button>
               </div>
+              {isLuggage && (
+                <div className="mt-4 p-4 bg-brand-latte/10 rounded-2xl border border-brand-latte/25 text-xs text-gray-700 font-sans leading-relaxed">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-serif font-bold text-gray-900 text-sm flex items-center gap-1.5">
+                      <span>🧳</span> <span>Luggage Cover Size Guide</span>
+                    </p>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-brand-gold bg-brand-gold/10 px-2 py-0.5 rounded-full border border-brand-gold/20">
+                      High Stretch Fabric
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] mb-3">
+                    <div className={`p-2.5 rounded-xl border transition-all ${selectedSize === 'baby' ? 'bg-white border-brand-flamingo/40 shadow-xs' : 'bg-white/60 border-brand-latte/20'}`}>
+                      <p className="font-bold text-gray-900 text-xs mb-0.5">Size M (22" – 26" Suitcases)</p>
+                      <p className="text-gray-500 font-sans">Body Height: <strong>58–63 cm</strong></p>
+                      <p className="text-gray-500 font-sans">Width: <strong>39–42 cm</strong> │ Depth: <strong>23–27 cm</strong></p>
+                    </div>
+
+                    <div className={`p-2.5 rounded-xl border transition-all ${selectedSize === 'adult' ? 'bg-white border-brand-flamingo/40 shadow-xs' : 'bg-white/60 border-brand-latte/20'}`}>
+                      <p className="font-bold text-gray-900 text-xs mb-0.5">Size L (28" – 32" Suitcases)</p>
+                      <p className="text-gray-500 font-sans">Body Height: <strong>65–70 cm</strong></p>
+                      <p className="text-gray-500 font-sans">Width: <strong>47–50 cm</strong> │ Depth: <strong>26–30 cm</strong></p>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-gray-500 italic mb-3">
+                    💡 <strong>Measurement tip:</strong> Measure your suitcase body height <em>excluding the wheels</em>. If your luggage is expandable or extra-deep, we recommend sizing up to Size L.
+                  </p>
+
+                  {/* Strictly No Size Replacement Warning */}
+                  <div className="p-3 bg-amber-50/90 border border-amber-300/80 rounded-xl flex items-start gap-2.5 text-amber-900 shadow-xs">
+                    <AlertCircle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-[11px] leading-relaxed">
+                      <strong className="block text-amber-950 font-bold mb-0.5 uppercase tracking-wide text-[10px]">
+                        ⚠️ Strictly No Size Replacement
+                      </strong>
+                      <span>
+                        Suitcase dimensions vary significantly by brand and model. Please measure your luggage carefully before placing your order. <strong>We do not accept size replacements, returns, or exchanges</strong> for luggage covers due to incorrect size choice.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             )}
 
             <div className="flex flex-col gap-4 mb-12">
+               {isLuggage && (
+                 <div className="flex items-center justify-between px-3 py-1.5 bg-brand-pink/5 rounded-full border border-brand-latte/20 text-[10px] text-gray-600 font-sans">
+                   <span>Selected: <strong className="text-gray-900 font-bold">{selectedSize === 'baby' ? 'Size M (22"–26")' : 'Size L (28"–32")'}</strong></span>
+                   <span className="text-brand-flamingo font-bold uppercase tracking-wider text-[9px]">Final Sale • No Size Replacement</span>
+                 </div>
+               )}
                <div className="flex flex-col sm:flex-row gap-4">
                  <div className="flex items-center border border-brand-latte/30 rounded-full h-12 w-full sm:w-32 px-4 justify-between bg-white">
                    <button onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={isSoldOut} className="text-gray-400 hover:text-brand-flamingo disabled:opacity-30"><Minus size={14}/></button>
@@ -308,8 +389,16 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                  <div className="flex items-start gap-3 text-brand-gold bg-brand-gold/5 p-4 rounded-[2px] border border-brand-gold/10">
                    <Clock size={18} className="mt-0.5 flex-shrink-0" />
                    <div>
-                     <p className="font-bold text-xs uppercase tracking-wider mb-1">Item Sold Out</p>
-                     <p className="font-serif italic text-sm text-gray-600">This item is available for <strong>pre-order</strong>. It is currently crafting and will ship in approximately <strong>2 weeks</strong>.</p>
+                     <p className="font-bold text-xs uppercase tracking-wider mb-1">
+                       {isLuggage ? 'Coming Soon • Pre-Order Open' : 'Item Sold Out'}
+                     </p>
+                     <p className="font-serif italic text-sm text-gray-600">
+                       {isLuggage ? (
+                         <>This item is available for <strong>pre-order</strong> under our <em>Once Upon a Traveller</em> collection. Pre-orders ensure reservation from our upcoming limited production release.</>
+                       ) : (
+                         <>This item is available for <strong>pre-order</strong>. It is currently crafting and will ship in approximately <strong>2 weeks</strong>.</>
+                       )}
+                     </p>
                    </div>
                  </div>
                ) : isSoldOut ? (
@@ -332,14 +421,30 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
               <AccordionItem title="Material & Composition" isOpen={openSection === 'material'} toggle={() => toggleSection('material')}>
                 <div className="flex items-start gap-3"><Leaf size={16} className="text-brand-latte mt-1 flex-shrink-0" /><p>{product.material || 'Premium ethically sourced fibers.'}</p></div>
               </AccordionItem>
-              <AccordionItem title="Dimensions" isOpen={openSection === 'size'} toggle={() => toggleSection('size')}>
-                <div className="flex items-start gap-3"><Ruler size={16} className="text-brand-latte mt-1 flex-shrink-0" /><p>{product.size || 'One size fits most.'}</p></div>
+              <AccordionItem title="Dimensions & Sizing" isOpen={openSection === 'size'} toggle={() => toggleSection('size')}>
+                <div className="flex items-start gap-3">
+                  <Ruler size={16} className="text-brand-latte mt-1 flex-shrink-0" />
+                  <div className="text-sm">
+                    {isLuggage ? (
+                      <div className="space-y-2.5 text-gray-600">
+                        <p><strong>Size M (22" – 26" Suitcases):</strong> Height 58–63 cm, Width 39–42 cm, Depth 23–27 cm.</p>
+                        <p><strong>Size L (28" – 32" Suitcases):</strong> Height 65–70 cm, Width 47–50 cm, Depth 26–30 cm.</p>
+                        <p className="text-xs text-gray-500">Crafted from high-elasticity spandex-polyester blend with dual top handle openings, side zip access, and reinforced bottom zipper with heavy-duty safety buckle.</p>
+                        <div className="mt-2 p-2.5 bg-amber-50 rounded-lg border border-amber-200 text-amber-900 text-xs">
+                          <strong>⚠️ Size Policy:</strong> Strictly no size exchange or replacement. Please measure your luggage body before ordering.
+                        </div>
+                      </div>
+                    ) : (
+                      <p>{product.size || 'One size fits most.'}</p>
+                    )}
+                  </div>
+                </div>
               </AccordionItem>
               <AccordionItem title="Care Instructions" isOpen={openSection === 'care'} toggle={() => toggleSection('care')}>
                 <div className="flex items-start gap-3"><Info size={16} className="text-brand-latte mt-1 flex-shrink-0" /><p>{product.care || 'Gentle hand wash recommended to preserve the softness of the fibers.'}</p></div>
               </AccordionItem>
               <AccordionItem title="Shipping & Returns" isOpen={openSection === 'shipping'} toggle={() => toggleSection('shipping')}>
-                 <div className="flex items-start gap-3"><Truck size={16} className="text-brand-latte mt-1 flex-shrink-0" /><div className="flex flex-col gap-3"><p>Delivery to West Malaysia starts at RM 8.00 (1 item), RM 10.00 (2-3 items), and RM 12.00 (4-6 items). </p><p>Shipping to East Malaysia (Sabah & Sarawak) is RM 20.00 (1 item), RM 40.00 (2-3 items), and RM 60.00 (4-5 items).</p><p className="italic text-brand-gold">Please kindly note that all sales are final. We are unable to accept returns or exchanges.</p></div></div>
+                 <div className="flex items-start gap-3"><Truck size={16} className="text-brand-latte mt-1 flex-shrink-0" /><div className="flex flex-col gap-3"><p>Delivery to West Malaysia starts at RM 8.00 (1 item), RM 10.00 (2-3 items), and RM 12.00 (4-6 items). </p><p>Shipping to East Malaysia (Sabah & Sarawak) is RM 20.00 (1 item), RM 40.00 (2-3 items), and RM 60.00 (4-5 items).</p><p className="italic text-brand-gold">Please kindly note that all sales are final. We are unable to accept returns or exchanges. {isLuggage && <strong className="block mt-1 text-brand-flamingo font-semibold">Luggage covers are final sale with strictly no size replacement.</strong>}</p></div></div>
               </AccordionItem>
             </div>
 
@@ -420,12 +525,12 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          <div className={`grid gap-6 mx-auto ${hasLiveLuggageCovers ? 'grid-cols-1 md:grid-cols-3 max-w-5xl' : 'grid-cols-1 md:grid-cols-2 max-w-3xl'}`}>
             {/* Blankets Card */}
             <div 
               id="nav-blankets-card"
               onClick={() => navigate('/collections/Blankets')}
-              className={`group/col-nav relative overflow-hidden rounded-[20px] p-6 sm:p-8 flex flex-row items-center justify-between min-h-[140px] md:min-h-[160px] cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-md ${
+              className={`group/col-nav relative overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-row items-center justify-between min-h-[140px] md:min-h-[160px] cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-md ${
                 productGroup === 'Blankets' 
                   ? 'bg-brand-pink/10 border-brand-flamingo/30' 
                   : 'bg-brand-pink/[0.03] hover:bg-brand-pink/[0.08] border-brand-latte/15'
@@ -441,11 +546,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-flamingo animate-pulse" />
                     )}
                   </div>
-                  <h3 className="font-serif text-xl sm:text-2xl text-gray-900 mb-1 leading-tight">
-                    The Blanket Collection
+                  <h3 className="font-serif text-lg sm:text-xl text-gray-900 mb-1 leading-tight">
+                    The Blankets
                   </h3>
                   <p className="font-sans text-[11px] text-gray-500 leading-relaxed line-clamp-2 pr-2">
-                    Signature stories woven in clouds of warmth and cozy adventures.
+                    Signature stories woven in clouds of warmth.
                   </p>
                 </div>
                 
@@ -456,7 +561,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
               </div>
 
               {blanketImage && (
-                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shadow-md border border-white rotate-3 group-hover/col-nav:rotate-0 group-hover/col-nav:scale-105 transition-all duration-300 flex-shrink-0">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shadow-md border border-white rotate-3 group-hover/col-nav:rotate-0 group-hover/col-nav:scale-105 transition-all duration-300 flex-shrink-0">
                   <img src={blanketImage} alt="Blanket Collection" className="w-full h-full object-cover" />
                 </div>
               )}
@@ -466,7 +571,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
             <div 
               id="nav-swaddles-card"
               onClick={() => navigate('/collections/Swaddle')}
-              className={`group/col-nav relative overflow-hidden rounded-[20px] p-6 sm:p-8 flex flex-row items-center justify-between min-h-[140px] md:min-h-[160px] cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-md ${
+              className={`group/col-nav relative overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-row items-center justify-between min-h-[140px] md:min-h-[160px] cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-md ${
                 productGroup === 'Swaddle' 
                   ? 'bg-brand-gold/10 border-brand-gold/40' 
                   : 'bg-brand-gold/[0.03] hover:bg-brand-gold/[0.08] border-brand-latte/15'
@@ -482,11 +587,11 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-gold animate-pulse" />
                     )}
                   </div>
-                  <h3 className="font-serif text-xl sm:text-2xl text-gray-900 mb-1 leading-tight">
-                    The Swaddle Collection
+                  <h3 className="font-serif text-lg sm:text-xl text-gray-900 mb-1 leading-tight">
+                    The Swaddles
                   </h3>
                   <p className="font-sans text-[11px] text-gray-500 leading-relaxed line-clamp-2 pr-2">
-                    Gentle, breathable cocoons made of silky soft bamboo fabric.
+                    Gentle, breathable cocoons in silky soft fabric.
                   </p>
                 </div>
                 
@@ -497,11 +602,54 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
               </div>
 
               {swaddleImage && (
-                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shadow-md border border-white -rotate-3 group-hover/col-nav:rotate-0 group-hover/col-nav:scale-105 transition-all duration-300 flex-shrink-0">
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shadow-md border border-white -rotate-3 group-hover/col-nav:rotate-0 group-hover/col-nav:scale-105 transition-all duration-300 flex-shrink-0">
                   <img src={swaddleImage} alt="Swaddle Collection" className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
+
+            {/* Luggage Cover Card (Only shown if collection has live products) */}
+            {hasLiveLuggageCovers && (
+              <div 
+                id="nav-luggage-card"
+                onClick={() => navigate('/collections/Luggage%20Cover')}
+                className={`group/col-nav relative overflow-hidden rounded-[20px] p-6 sm:p-7 flex flex-row items-center justify-between min-h-[140px] md:min-h-[160px] cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-md ${
+                  productGroup === 'Luggage Cover' 
+                    ? 'bg-brand-latte/20 border-brand-flamingo/30' 
+                    : 'bg-brand-latte/[0.05] hover:bg-brand-latte/[0.12] border-brand-latte/15'
+                }`}
+              >
+                <div className="relative z-10 max-w-[60%] flex flex-col justify-between h-full text-left">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-sans text-[9px] uppercase tracking-wider font-bold text-brand-flamingo">
+                        {productGroup === 'Luggage Cover' ? 'Currently viewing' : 'Pre-Order'}
+                      </span>
+                      {productGroup === 'Luggage Cover' && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-flamingo animate-pulse" />
+                      )}
+                    </div>
+                    <h3 className="font-serif text-lg sm:text-xl text-gray-900 mb-1 leading-tight">
+                      The Luggage Covers
+                    </h3>
+                    <p className="font-sans text-[11px] text-gray-500 leading-relaxed line-clamp-2 pr-2">
+                      Once Upon a Traveller. Fairytale travel cover.
+                    </p>
+                  </div>
+                  
+                  <div className="mt-4 flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-nav:text-brand-gold transition-colors">
+                    <span>Explore Covers</span>
+                    <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+
+                {luggageImage && (
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden shadow-md border border-white rotate-2 group-hover/col-nav:rotate-0 group-hover/col-nav:scale-105 transition-all duration-300 flex-shrink-0">
+                    <img src={luggageImage} alt="The Parisian Flight Luggage Cover" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

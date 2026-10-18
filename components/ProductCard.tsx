@@ -14,12 +14,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
   const [addState, setAddState] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const stock = product.stock || 0;
-  const productGroup = (!product.collection || product.collection === 'Blankets' || product.collection.toLowerCase().includes('blanket') || (product.category && product.category.toLowerCase().includes('blanket'))) ? 'Blankets' : 'Swaddle';
-  const isBlanket = productGroup === 'Blankets';
+  const isLuggage = Boolean((product.collection && product.collection.toLowerCase().includes('luggage')) || (product.category && product.category.toLowerCase().includes('luggage')));
+  const isBlanket = !isLuggage && (!product.collection || product.collection === 'Blankets' || product.collection.toLowerCase().includes('blanket') || (product.category && product.category.toLowerCase().includes('blanket')));
   
-  const isPreOrder = stock <= 0 && isBlanket;
-  const isSoldOut = stock <= 0 && !isBlanket;
-  const isLowStock = stock > 0 && stock <= 5;
+  const isPreOrder = isLuggage || (stock <= 0 && isBlanket) || Boolean((product as any).isPreOrder) || (product.badge || '').toLowerCase().includes('pre-order');
+  const isSoldOut = stock <= 0 && !isBlanket && !isLuggage && !isPreOrder;
+  const isLowStock = !isPreOrder && stock > 0 && stock <= 5;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,7 +89,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
         <h3 className="font-serif text-3xl text-gray-900 mb-2 group-hover:text-brand-flamingo transition-colors duration-300">{product.name}</h3>
         <p className="font-script text-2xl text-brand-gold mb-3 -mt-1 flex items-center justify-center gap-2">
           <Sparkles size={12} className="opacity-50" />
-          {(!product.collection || product.collection === 'Blankets') ? 'Blanket Collection' : product.collection}
+          {(!product.collection || product.collection === 'Blankets') 
+            ? 'Blanket Collection' 
+            : product.collection.toLowerCase().includes('luggage') 
+            ? 'Luggage Cover Collection' 
+            : product.collection}
           <Sparkles size={12} className="opacity-50" />
         </p>
         <p className="font-serif text-gray-500 mb-4 max-w-[250px] mx-auto text-sm leading-relaxed line-clamp-2 opacity-80">{descriptionPreview}</p>
@@ -101,7 +105,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
           {/* Updated Text Description for Pre-orders */}
           {isPreOrder ? (
             <span className="font-serif italic text-[10px] md:text-xs text-brand-gold mt-1 font-medium">
-              Sold Out • Pre-order ships in 2 weeks
+              {isLuggage ? 'Pre-Order Open • Coming Soon' : 'Sold Out • Pre-order ships in 2 weeks'}
             </span>
           ) : isSoldOut ? (
             <span className="font-serif italic text-[10px] md:text-xs text-red-500 mt-1 font-medium">

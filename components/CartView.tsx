@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product, CartItem } from '../types';
-import { Minus, Plus, Trash2, ArrowRight, ArrowLeft, Gift, PenTool, Clock, X } from 'lucide-react';
+import { Minus, Plus, Trash2, ArrowRight, ArrowLeft, Gift, PenTool, Clock, X, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const getProductSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
@@ -51,24 +51,30 @@ export const CartView: React.FC<CartViewProps> = ({
   // Swaddle & Blanket counts
   const swaddleCount = cart.reduce((sum, item) => {
     if (isAddonProduct(item)) return sum;
+    const isLuggage = (item.collection || '').toLowerCase().includes('luggage') || (item.category || '').toLowerCase().includes('luggage');
+    if (isLuggage) return sum;
     const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
     return isBlanket ? sum : sum + item.quantity;
   }, 0);
 
   const blanketCount = cart.reduce((sum, item) => {
     if (isAddonProduct(item)) return sum;
+    const isLuggage = (item.collection || '').toLowerCase().includes('luggage') || (item.category || '').toLowerCase().includes('luggage');
+    if (isLuggage) return sum;
     const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
     return isBlanket ? sum + item.quantity : sum;
   }, 0);
 
-  const hasAdultBlanket = cart.some(item => !isAddonProduct(item) && item.sizeOption === 'adult');
+  const hasAdultBlanket = cart.some(item => !isAddonProduct(item) && item.sizeOption === 'adult' && !((item.collection || '').toLowerCase().includes('luggage')));
   const hasBabyBlanketOrSwaddle = cart.some(item => {
     if (isAddonProduct(item)) return false;
+    const isLuggage = (item.collection || '').toLowerCase().includes('luggage') || (item.category || '').toLowerCase().includes('luggage');
+    if (isLuggage) return false;
     const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
     if (isBlanket) {
       return item.sizeOption === 'baby';
     }
-    // Any non-addon product that is not a blanket is a swaddle
+    // Any non-addon product that is not a blanket or luggage is a swaddle
     return true;
   });
 
@@ -124,13 +130,36 @@ export const CartView: React.FC<CartViewProps> = ({
                   <div className="flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                       <h3 className="font-serif text-xl text-gray-900 mb-1">{item.name}</h3>
-                      <p className="font-sans text-xs text-gray-500 mb-2">{item.collection || 'Blankets'}</p>
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <p className="font-sans text-xs text-gray-500">{item.collection || 'Blankets'}</p>
+                        {(() => {
+                          const isLuggage = item.productType === 'luggage-cover' || (item.collection && item.collection.toLowerCase().includes('luggage')) || (item.category && item.category.toLowerCase().includes('luggage'));
+                          if (!isLuggage) return null;
+                          const sizeLabel = item.sizeOption || (item.id.includes('-adult') ? 'Size L (28"–32")' : item.id.includes('-baby') ? 'Size M (22"–26")' : 'Size M');
+                          return (
+                            <span className="text-[10px] font-bold bg-brand-latte/20 text-gray-800 px-2 py-0.5 rounded-full border border-brand-latte/30">
+                              {sizeLabel}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       
                       {item.isPreOrder && (
                         <p className="text-xs text-brand-gold font-bold uppercase tracking-wide flex items-center gap-1 mb-2">
-                          <Clock size={12} /> Ships in 2 Weeks
+                          <Clock size={12} /> {item.collection?.toLowerCase().includes('luggage') ? 'Pre-Order • Production Batch' : 'Ships in 2 Weeks'}
                         </p>
                       )}
+
+                      {(() => {
+                        const isLuggage = item.productType === 'luggage-cover' || (item.collection && item.collection.toLowerCase().includes('luggage')) || (item.category && item.category.toLowerCase().includes('luggage'));
+                        if (!isLuggage) return null;
+                        return (
+                          <div className="mb-3 p-2.5 bg-amber-50/90 border border-amber-300/70 rounded-lg flex items-start gap-1.5 text-amber-900 text-[10.5px] max-w-sm">
+                            <AlertCircle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                            <span><strong>No Size Replacement:</strong> Please confirm your suitcase measurements. Strictly no exchanges or replacements.</span>
+                          </div>
+                        );
+                      })()}
                       
                       <p className="font-sans text-sm font-bold text-gray-900">RM {item.price}</p>
 
@@ -380,6 +409,20 @@ export const CartView: React.FC<CartViewProps> = ({
                 </div>
                 <p className="text-[10px] text-gray-400 mt-2 font-sans text-right">Including taxes & duties</p>
               </div>
+
+              {cart.some(item => item.productType === 'luggage-cover' || (item.collection && item.collection.toLowerCase().includes('luggage')) || (item.category && item.category.toLowerCase().includes('luggage'))) && (
+                <div className="mb-6 p-3.5 bg-amber-50/90 border border-amber-300/80 rounded-xl flex items-start gap-2.5 text-amber-950 text-xs">
+                  <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <strong className="block text-[10.5px] uppercase tracking-wide font-bold mb-0.5 text-amber-950">
+                      ⚠️ Luggage Cover Policy
+                    </strong>
+                    <span className="text-[11px] text-amber-900">
+                      Strictly no size replacements or exchanges accepted. Please ensure your luggage measurements match your selected cover size.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <button 
                 onClick={() => navigate('/checkout')}

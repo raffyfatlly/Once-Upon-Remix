@@ -23,7 +23,7 @@ import { AmbassadorLogin } from './components/AmbassadorLogin';
 import { AmbassadorDashboard } from './components/AmbassadorDashboard';
 import { CakenicLandingPage } from './components/CakenicLandingPage';
 import { Product, SiteConfig, CartItem, Order, Ambassador } from './types';
-import { Star, Cloud, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { Star, Cloud, AlertCircle, ArrowRight, ChevronLeft, ChevronRight, Sparkles, Clock } from 'lucide-react';
 import { subscribeToProducts, subscribeToOrders } from './firebase';
 import { initializeAnalytics, trackAddToCart } from './analytics';
 import { PRODUCTS } from './constants';
@@ -90,37 +90,43 @@ const StoreFront: React.FC<{
   const getProductGroup = (product: Product) => {
     const raw = product.category?.trim() || product.collection || 'Blankets';
     const lower = raw.toLowerCase();
+    if (lower.includes('luggage')) return 'Luggage Cover';
     if (lower.includes('blanket')) return 'Blankets';
     if (lower.includes('swaddle')) return 'Swaddle';
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
 
+  const PARISIAN_FLIGHT_LUGGAGE_IMAGE = 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792298424226_The_Parisian_Flight_luggage_artwork.png?alt=media&token=407936c3-559b-4c6a-9dd3-ad356979f1da';
+
   const groupedProducts = React.useMemo(() => {
-    const rawGroups = products.reduce((acc, product) => {
+    // Only group products that are LIVE (p.isLive !== false)
+    const liveProducts = products.filter(p => p.isLive !== false && (p as any).isLive !== 'false');
+
+    const rawGroups = liveProducts.reduce((acc, product) => {
       const collection = getProductGroup(product);
       if (!acc[collection]) acc[collection] = [];
       acc[collection].push(product);
       return acc;
     }, {} as Record<string, Product[]>);
 
-    // Order collections (Blankets first, then Swaddle, then others)
-    // and sort products inside each collection to feature top designs first (not alphabetical A-Z)
+    // Order collections (Blankets first, then Swaddle, then Luggage Cover, then others)
+    // ONLY include collections that actually have at least 1 live product!
     const orderedGroups: Record<string, Product[]> = {};
-    const preferredOrder = ['Blankets', 'Swaddle'];
+    const preferredOrder = ['Blankets', 'Swaddle', 'Luggage Cover'];
     preferredOrder.forEach(key => {
-      if (rawGroups[key]) {
+      if (rawGroups[key] && rawGroups[key].length > 0) {
         orderedGroups[key] = sortCollectionProducts(key, rawGroups[key]);
       }
     });
     Object.keys(rawGroups).forEach(key => {
-      if (!preferredOrder.includes(key)) {
+      if (!preferredOrder.includes(key) && rawGroups[key] && rawGroups[key].length > 0) {
         orderedGroups[key] = sortCollectionProducts(key, rawGroups[key]);
       }
     });
     return orderedGroups;
   }, [products]);
 
-  // Category card preview images (Jubilee Carousel for Blanket, Whimsy Fair for Swaddle)
+  // Category card preview images (Jubilee Carousel for Blanket, Whimsy Fair for Swaddle, Parisian Flight for Luggage Cover)
   const blanketCardImage = 
     products.find(p => {
       const name = (p.name || '').toLowerCase();
@@ -144,6 +150,14 @@ const StoreFront: React.FC<{
       return name.includes('whimsy') || name.includes('fair');
     })?.image || 
     groupedProducts['Swaddle']?.[0]?.image;
+
+  const luggageCardImage = 
+    products.find(p => {
+      const name = (p.name || '').toLowerCase();
+      const isLuggage = getProductGroup(p) === 'Luggage Cover';
+      return isLuggage && (name.includes('parisian') || name.includes('flight')) && p.image;
+    })?.image || 
+    PARISIAN_FLIGHT_LUGGAGE_IMAGE;
 
   // Review Carousel State
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
@@ -212,7 +226,7 @@ const StoreFront: React.FC<{
                  <p className="font-serif italic text-lg text-gray-600 leading-relaxed mb-6">
                    "Weaving stories into the softest threads. Every piece is designed to be cherished, held, and loved."
                  </p>
-                 <div className="flex justify-center gap-6 text-[10px] font-bold uppercase tracking-widest text-brand-gold/80">
+                 <div className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-brand-gold/80 text-center">
                    {Object.keys(groupedProducts).length > 0 ? (
                       Object.keys(groupedProducts).map((c, i) => (
                         <React.Fragment key={c}>
@@ -232,79 +246,134 @@ const StoreFront: React.FC<{
              </div>
           </div>
 
-          {products.length > 0 && (
-            <div className="px-6 mb-24 max-w-5xl mx-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                {/* Blankets Card */}
-                <div 
-                  onClick={() => navigate('/collections/Blankets')}
-                  className="group/col-card relative overflow-hidden rounded-[24px] bg-brand-pink/5 border border-brand-latte/20 p-6 sm:p-8 flex flex-col justify-between min-h-[220px] md:min-h-[260px] cursor-pointer hover:border-brand-flamingo/30 transition-all duration-500 shadow-sm hover:shadow-md text-left"
-                >
-                  <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-pink/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
-                  <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
-                  
-                  {blanketCardImage && (
-                    <div className="absolute right-2 bottom-4 w-28 h-28 sm:right-4 sm:bottom-4 sm:w-32 sm:h-32 md:w-38 md:h-38 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
-                      <img src={blanketCardImage} alt="Jubilee Carousel Blanket" className="w-full h-full object-cover" />
+          {(() => {
+            const hasLiveBlankets = Boolean(groupedProducts['Blankets'] && groupedProducts['Blankets'].length > 0);
+            const hasLiveSwaddles = Boolean(groupedProducts['Swaddle'] && groupedProducts['Swaddle'].length > 0);
+            const hasLiveLuggageCovers = Boolean(groupedProducts['Luggage Cover'] && groupedProducts['Luggage Cover'].length > 0);
+            const visibleCardsCount = (hasLiveBlankets ? 1 : 0) + (hasLiveSwaddles ? 1 : 0) + (hasLiveLuggageCovers ? 1 : 0);
+
+            if (visibleCardsCount === 0) return null;
+
+            return (
+              <div className="px-6 mb-24 max-w-6xl mx-auto">
+                <div className={`grid gap-6 md:gap-6 lg:gap-8 ${
+                  visibleCardsCount === 1 ? 'grid-cols-1 max-w-md mx-auto' :
+                  visibleCardsCount === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto' :
+                  'grid-cols-1 md:grid-cols-3'
+                }`}>
+                  {/* Blankets Card */}
+                  {hasLiveBlankets && (
+                    <div 
+                      onClick={() => navigate('/collections/Blankets')}
+                      className="group/col-card relative overflow-hidden rounded-[24px] bg-brand-pink/5 border border-brand-latte/20 p-6 sm:p-7 flex flex-col justify-between min-h-[220px] md:min-h-[280px] cursor-pointer hover:border-brand-flamingo/30 transition-all duration-500 shadow-sm hover:shadow-md text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-pink/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
+                      <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
+                      
+                      {blanketCardImage && (
+                        <div className="absolute right-2 bottom-4 w-24 h-24 sm:right-3 sm:bottom-4 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
+                          <img src={blanketCardImage} alt="Jubilee Carousel Blanket" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
+                      <div className="relative z-10 max-w-[62%] sm:max-w-none">
+                        <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-gray-900 mb-2 leading-tight flex flex-wrap items-center gap-1.5 tracking-tight pr-2 sm:pr-0">
+                          The <span className="italic font-serif font-medium text-brand-gold">Blanket</span> Collection
+                          <Sparkles size={14} className="text-brand-gold/60 inline-block" />
+                        </h3>
+                        <p className="font-sans text-xs text-gray-500 max-w-full sm:max-w-[190px] md:max-w-[210px] leading-relaxed">
+                          Wrap them in their very first story. Each beautiful design brings a new adventure to life.
+                        </p>
+                      </div>
+
+                      <div className="mt-6 flex items-center gap-2 relative z-10">
+                        <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-card:text-brand-gold transition-colors">
+                          Explore Blankets
+                        </span>
+                        <span className="w-4 h-[1px] bg-brand-flamingo group-hover/col-card:w-8 group-hover/col-card:bg-brand-gold transition-all duration-300"></span>
+                      </div>
                     </div>
                   )}
 
-                  <div className="relative z-10 max-w-[58%] sm:max-w-none">
-                    <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl text-gray-900 mb-2 leading-tight flex flex-wrap items-center gap-1.5 tracking-tight pr-2 sm:pr-0">
-                      The <span className="italic font-serif font-medium text-brand-gold">Blanket</span> Collection
-                      <Sparkles size={16} className="text-brand-gold/60 inline-block" />
-                    </h3>
-                    <p className="font-sans text-xs text-gray-500 max-w-full sm:max-w-[200px] md:max-w-[240px] leading-relaxed">
-                      Wrap them in their very first story. Each beautiful design brings a new adventure to life, creating a soft and magical companion for your little one's everyday memories.
-                    </p>
-                  </div>
+                  {/* Swaddle Card */}
+                  {hasLiveSwaddles && (
+                    <div 
+                      onClick={() => navigate('/collections/Swaddle')}
+                      className="group/col-card relative overflow-hidden rounded-[24px] bg-brand-gold/5 border border-brand-latte/20 p-6 sm:p-7 flex flex-col justify-between min-h-[220px] md:min-h-[280px] cursor-pointer hover:border-brand-flamingo/30 transition-all duration-500 shadow-sm hover:shadow-md text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-gold/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
+                      <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
 
-                  <div className="mt-6 flex items-center gap-2 relative z-10">
-                    <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-card:text-brand-gold transition-colors">
-                      Explore Blankets
-                    </span>
-                    <span className="w-4 h-[1px] bg-brand-flamingo group-hover/col-card:w-8 group-hover/col-card:bg-brand-gold transition-all duration-300"></span>
-                  </div>
-                </div>
+                      {swaddleCardImage && (
+                        <div className="absolute right-2 bottom-4 w-24 h-24 sm:right-3 sm:bottom-4 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
+                          <img src={swaddleCardImage} alt="Whimsy Fair Swaddle" className="w-full h-full object-cover" />
+                        </div>
+                      )}
 
-                {/* Swaddle Card */}
-                <div 
-                  onClick={() => navigate('/collections/Swaddle')}
-                  className="group/col-card relative overflow-hidden rounded-[24px] bg-brand-gold/5 border border-brand-latte/20 p-6 sm:p-8 flex flex-col justify-between min-h-[220px] md:min-h-[260px] cursor-pointer hover:border-brand-flamingo/30 transition-all duration-500 shadow-sm hover:shadow-md text-left"
-                >
-                  <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-gold/20 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
-                  <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
+                      <div className="relative z-10 max-w-[62%] sm:max-w-none">
+                        <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-gray-900 mb-2 leading-tight flex flex-wrap items-center gap-1.5 tracking-tight pr-2 sm:pr-0">
+                          The <span className="italic font-serif font-medium text-brand-gold">Swaddle</span> Collection
+                          <Sparkles size={14} className="text-brand-gold/60 inline-block" />
+                        </h3>
+                        <p className="font-sans text-xs text-gray-500 max-w-full sm:max-w-[190px] md:max-w-[210px] leading-relaxed">
+                          A beautiful canvas for their earliest chapters. Silky, breathable softness cocooning newborn dreams.
+                        </p>
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[8.5px] font-bold uppercase tracking-[0.12em] mt-2">
+                          <Sparkles size={9} />
+                          <span>Newly Released</span>
+                        </div>
+                      </div>
 
-                  {swaddleCardImage && (
-                    <div className="absolute right-2 bottom-4 w-28 h-28 sm:right-4 sm:bottom-4 sm:w-32 sm:h-32 md:w-38 md:h-38 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
-                      <img src={swaddleCardImage} alt="Whimsy Fair Swaddle" className="w-full h-full object-cover" />
+                      <div className="mt-6 flex items-center gap-2 relative z-10">
+                        <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-card:text-brand-gold transition-colors">
+                          Explore Swaddles
+                        </span>
+                        <span className="w-4 h-[1px] bg-brand-flamingo group-hover/col-card:w-8 group-hover/col-card:bg-brand-gold transition-all duration-300"></span>
+                      </div>
                     </div>
                   )}
 
-                  <div className="relative z-10 max-w-[58%] sm:max-w-none">
-                    <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl text-gray-900 mb-2 leading-tight flex flex-wrap items-center gap-1.5 tracking-tight pr-2 sm:pr-0">
-                      The <span className="italic font-serif font-medium text-brand-gold">Swaddle</span> Collection
-                      <Sparkles size={16} className="text-brand-gold/60 inline-block" />
-                    </h3>
-                    <p className="font-sans text-xs text-gray-500 max-w-full sm:max-w-[200px] md:max-w-[240px] leading-relaxed">
-                      A beautiful canvas for their earliest chapters. Spun for silky, breathable softness, these generous wraps gracefully cocoon your newborn in peaceful dreams.
-                    </p>
-                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[9px] font-bold uppercase tracking-[0.15em] mt-2.5">
-                      <Sparkles size={10} />
-                      <span>Newly Released!</span>
-                    </div>
-                  </div>
+                  {/* Luggage Cover Card (Only shown if collection has live products) */}
+                  {hasLiveLuggageCovers && (
+                    <div 
+                      onClick={() => navigate('/collections/Luggage%20Cover')}
+                      className="group/col-card relative overflow-hidden rounded-[24px] bg-brand-latte/10 border border-brand-latte/20 p-6 sm:p-7 flex flex-col justify-between min-h-[220px] md:min-h-[280px] cursor-pointer hover:border-brand-flamingo/30 transition-all duration-500 shadow-sm hover:shadow-md text-left"
+                    >
+                      <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-bl from-brand-latte/30 to-transparent rounded-bl-full pointer-events-none group-hover/col-card:scale-110 transition-transform duration-500" />
+                      <Star className="absolute top-6 right-6 text-brand-gold/40 animate-pulse pointer-events-none" size={20} />
 
-                  <div className="mt-6 flex items-center gap-2 relative z-10">
-                    <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-card:text-brand-gold transition-colors">
-                      Explore Swaddles
-                    </span>
-                    <span className="w-4 h-[1px] bg-brand-flamingo group-hover/col-card:w-8 group-hover/col-card:bg-brand-gold transition-all duration-300"></span>
-                  </div>
+                      {luggageCardImage && (
+                        <div className="absolute right-2 bottom-4 w-24 h-24 sm:right-3 sm:bottom-4 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl overflow-hidden shadow-xl border-2 border-white rotate-6 group-hover/col-card:rotate-3 group-hover/col-card:scale-105 transition-all duration-500 block">
+                          <img src={luggageCardImage} alt="The Parisian Flight Luggage Cover" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
+                      <div className="relative z-10 max-w-[62%] sm:max-w-none">
+                        <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-gray-900 mb-2 leading-tight flex flex-wrap items-center gap-1.5 tracking-tight pr-2 sm:pr-0">
+                          The <span className="italic font-serif font-medium text-brand-gold">Luggage Cover</span> Collection
+                          <Sparkles size={14} className="text-brand-gold/60 inline-block" />
+                        </h3>
+                        <p className="font-sans text-xs text-gray-500 max-w-full sm:max-w-[190px] md:max-w-[210px] leading-relaxed">
+                          Once Upon a Traveller. New places, same dreams, together. Premium fairytale travel covers.
+                        </p>
+                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[8.5px] font-bold uppercase tracking-[0.12em] mt-2">
+                          <Clock size={9} />
+                          <span>Coming Soon • Pre-Order</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex items-center gap-2 relative z-10">
+                        <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-flamingo group-hover/col-card:text-brand-gold transition-colors">
+                          Explore Luggage Covers
+                        </span>
+                        <span className="w-4 h-[1px] bg-brand-flamingo group-hover/col-card:w-8 group-hover/col-card:bg-brand-gold transition-all duration-300"></span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {products.length === 0 ? (
              <div className="text-center text-gray-400 font-sans text-sm italic py-20 bg-brand-grey/5 rounded-lg border border-dashed border-brand-latte/30 mx-6">
@@ -315,91 +384,152 @@ const StoreFront: React.FC<{
              </div>
           ) : (
             <div>
-              {Object.entries(groupedProducts).map(([collectionName, collectionProducts]) => (
-                <div key={collectionName} id={`row-section-${collectionName}`} className="mb-24 last:mb-0 relative group">
-                  {Object.keys(groupedProducts).length > 1 && (
-                     <div id={`row-title-${collectionName}`} className="px-6 mb-8 flex flex-col items-center md:items-start md:pl-16 relative">
-                       <div className="flex items-center gap-3 justify-center md:justify-start">
-                         <span className="font-serif text-3xl md:text-4xl text-gray-900 tracking-tight">
-                           {collectionName === 'Blankets' ? 'The Blanket Collection' : collectionName === 'Swaddle' ? 'The Swaddle Collection' : collectionName}
-                         </span>
-                       </div>
-                       <p className="font-script text-lg md:text-xl text-brand-gold mt-1 text-center md:text-left flex flex-col md:flex-row items-center gap-2">
-                         {collectionName.toLowerCase().includes('blanket') ? (
-                           'The signature of warmth and dreams'
-                         ) : (
-                           <>
-                             <span>Gentle touch for peaceful sleep</span>
-                             <span className="inline-flex items-center gap-1 text-[10px] font-sans font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 ml-0 md:ml-3">
-                               New Release
-                             </span>
-                           </>
-                         )}
-                       </p>
-                       <div className="h-[2px] w-12 bg-brand-gold/30 mt-3 rounded-full mb-4" />
-                       
-                       {collectionProducts.length > 1 && (
-                         <div className="flex md:hidden items-center gap-1.5 text-[10px] text-brand-flamingo uppercase tracking-[0.15em] font-bold animate-pulse mt-2">
-                           <span>Swipe to explore</span>
-                           <ArrowRight size={10} className="text-brand-flamingo" />
-                         </div>
-                       )}
-                     </div>
-                  )}
-                  
-                  {/* Desktop scroll buttons */}
-                  {collectionProducts.length > 2 && (
-                    <>
-                      <button 
-                        onClick={() => document.getElementById(`row-${collectionName.replace(/\s+/g, '-')}`)?.scrollBy({ left: -400, behavior: 'smooth' })}
-                        className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur items-center justify-center rounded-full shadow-sm border border-brand-latte/20 text-brand-latte hover:text-brand-flamingo hover:scale-105 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto"
-                        aria-label="Scroll left"
-                      >
-                        <ChevronLeft size={24} />
-                      </button>
-                      <button 
-                        onClick={() => document.getElementById(`row-${collectionName.replace(/\s+/g, '-')}`)?.scrollBy({ left: 400, behavior: 'smooth' })}
-                        className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/90 backdrop-blur items-center justify-center rounded-full shadow-sm border border-brand-latte/20 text-brand-latte hover:text-brand-flamingo hover:scale-105 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto cursor-pointer"
-                        aria-label="Scroll right"
-                      >
-                        <ChevronRight size={24} />
-                      </button>
-                    </>
-                  )}
+              {Object.entries(groupedProducts).map(([collectionName, collectionProducts], colIndex) => {
+                const isBlanket = collectionName.toLowerCase().includes('blanket');
+                const isSwaddle = collectionName.toLowerCase().includes('swaddle');
+                const isLuggage = collectionName.toLowerCase().includes('luggage');
 
-                  {/* 
-                     CAROUSEL LAYOUT 
-                     Mobile: Vertical Stack (flex-col)
-                     Desktop: Horizontal Scroll (flex-row + overflow-x-auto)
-                     Update: Using a wrapper strategy to ensure items are centered if they fit, 
-                     but scrollable (starting from left) if they overflow.
-                  */}
-                  <div 
-                    id={`row-${collectionName.replace(/\s+/g, '-')}`}
-                    className="overflow-x-auto pb-12 md:pb-16 hide-scrollbar w-full scroll-smooth pointer-events-auto snap-x snap-mandatory"
-                  >
-                    <div className="
-                      flex flex-row gap-8 px-6
-                      md:gap-16 md:px-12 items-stretch
-                      w-fit min-w-full md:justify-center
-                    ">
-                      {(collectionProducts as Product[]).map((product, index) => (
-                        <div 
-                          key={product.id} 
-                          className="w-[85vw] sm:w-[350px] md:min-w-[400px] md:max-w-[400px] snap-center flex-shrink-0"
-                        >
-                          <ProductCard 
-                            product={product} 
-                            onAddToCart={(p, qty) => onAddToCart(p, qty)}
-                            onClick={(p) => navigate(`/product/${getProductSlug(p)}`)}
-                            index={index}
-                          />
+                // Distinctive atmospheric background per collection - delicate, airy, and ultra-light
+                const sectionBg = isBlanket 
+                  ? 'bg-gradient-to-b from-white via-[#FCFAF7]/40 to-white border-y border-brand-latte/10'
+                  : isSwaddle
+                  ? 'bg-gradient-to-b from-[#FDFCF9] via-[#FAF6EE]/40 to-[#FDFCF9] border-y border-brand-gold/15'
+                  : isLuggage
+                  ? 'bg-gradient-to-b from-[#FAF8F4]/50 via-[#F6F2EB]/35 to-[#FAF8F4]/50 border-y border-brand-latte/20'
+                  : 'bg-white border-y border-brand-latte/10';
+
+                const chapterLabel = isBlanket
+                  ? 'Chapter I • Blankets'
+                  : isSwaddle
+                  ? 'Chapter II • Swaddles'
+                  : isLuggage
+                  ? 'Chapter III • Luggage Covers'
+                  : collectionName;
+
+                const collectionSubtitle = isBlanket
+                  ? 'The signature of warmth and dreams'
+                  : isSwaddle
+                  ? 'Gentle touch for peaceful sleep'
+                  : isLuggage
+                  ? 'Once Upon a Traveller • Same Dreams, Together'
+                  : 'Curated stories and cherished gifts';
+
+                return (
+                  <div key={collectionName} className="relative">
+                    {/* Storybook Inter-Collection Divider */}
+                    {colIndex > 0 && (
+                      <div className="flex items-center justify-center gap-3 py-4 md:py-6 my-1">
+                        <div className="h-[1px] w-12 sm:w-20 bg-gradient-to-r from-transparent to-brand-latte/25"></div>
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-latte/[0.06] border border-brand-latte/15 text-[9px] font-bold uppercase tracking-widest text-brand-gold/90">
+                          <Star size={9} className="text-brand-gold/60" fill="currentColor" />
+                          <span>{chapterLabel}</span>
+                          <Star size={9} className="text-brand-gold/60" fill="currentColor" />
                         </div>
-                      ))}
+                        <div className="h-[1px] w-12 sm:w-20 bg-gradient-to-l from-transparent to-brand-latte/25"></div>
+                      </div>
+                    )}
+
+                    <div 
+                      id={`row-section-${collectionName}`} 
+                      className={`py-8 md:py-12 my-2 md:my-4 rounded-3xl md:rounded-[32px] transition-all duration-500 relative group overflow-hidden ${sectionBg}`}
+                    >
+                      {/* Fairytale corner glow */}
+                      <div className="absolute top-0 right-0 w-64 h-64 bg-radial from-brand-gold/[0.02] to-transparent pointer-events-none rounded-bl-full" />
+                      
+                      {Object.keys(groupedProducts).length > 1 && (
+                        <div id={`row-title-${collectionName}`} className="px-6 mb-5 md:mb-7 flex flex-col items-center relative text-center">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[10px] font-sans font-bold uppercase tracking-[0.2em] text-brand-gold">
+                              {chapterLabel}
+                            </span>
+                            {isSwaddle && (
+                              <span className="text-[9px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/25">
+                                New Release
+                              </span>
+                            )}
+                            {isLuggage && (
+                              <span className="text-[9px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/25">
+                                Coming Soon • Pre-Order
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-center w-full">
+                            <h2 className="font-serif text-3xl md:text-4xl text-gray-900 tracking-tight text-center">
+                              {isBlanket 
+                                ? 'The Blanket Collection' 
+                                : isSwaddle 
+                                ? 'The Swaddle Collection' 
+                                : isLuggage
+                                ? 'The Luggage Cover Collection'
+                                : collectionName}
+                            </h2>
+                          </div>
+
+                          <div className="font-script text-lg md:text-xl text-brand-gold mt-1 text-center">
+                            <span>{collectionSubtitle}</span>
+                          </div>
+
+                          <div className="h-[2px] w-12 bg-brand-gold/30 mt-3 rounded-full mb-3 mx-auto" />
+                          
+                          {collectionProducts.length > 1 && (
+                            <div className="flex md:hidden items-center justify-center gap-1.5 text-[10px] text-brand-flamingo uppercase tracking-[0.15em] font-bold animate-pulse mt-1">
+                              <span>Swipe to explore</span>
+                              <ArrowRight size={10} className="text-brand-flamingo" />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Desktop scroll buttons */}
+                      {collectionProducts.length > 2 && (
+                        <>
+                          <button 
+                            onClick={() => document.getElementById(`row-${collectionName.replace(/\s+/g, '-')}`)?.scrollBy({ left: -400, behavior: 'smooth' })}
+                            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/95 backdrop-blur items-center justify-center rounded-full shadow-md border border-brand-latte/20 text-brand-latte hover:text-brand-flamingo hover:scale-105 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto"
+                            aria-label="Scroll left"
+                          >
+                            <ChevronLeft size={24} />
+                          </button>
+                          <button 
+                            onClick={() => document.getElementById(`row-${collectionName.replace(/\s+/g, '-')}`)?.scrollBy({ left: 400, behavior: 'smooth' })}
+                            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/95 backdrop-blur items-center justify-center rounded-full shadow-md border border-brand-latte/20 text-brand-latte hover:text-brand-flamingo hover:scale-105 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-auto cursor-pointer"
+                            aria-label="Scroll right"
+                          >
+                            <ChevronRight size={24} />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Carousel Layout */}
+                      <div 
+                        id={`row-${collectionName.replace(/\s+/g, '-')}`}
+                        className="overflow-x-auto pb-4 md:pb-6 hide-scrollbar w-full scroll-smooth pointer-events-auto snap-x snap-mandatory"
+                      >
+                        <div className="
+                          flex flex-row gap-6 sm:gap-8 px-[7.5vw]
+                          md:gap-16 md:px-12 items-stretch
+                          w-fit min-w-full md:justify-center
+                        ">
+                          {(collectionProducts as Product[]).map((product, index) => (
+                            <div 
+                              key={product.id} 
+                              className="w-[85vw] sm:w-[350px] md:min-w-[400px] md:max-w-[400px] snap-center flex-shrink-0"
+                            >
+                              <ProductCard 
+                                product={product} 
+                                onAddToCart={(p, qty) => onAddToCart(p, qty)}
+                                onClick={(p) => navigate(`/product/${getProductSlug(p)}`)}
+                                index={index}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

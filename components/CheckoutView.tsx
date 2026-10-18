@@ -45,17 +45,21 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
   // Swaddle & Blanket counts
   const swaddleCount = cart.reduce((sum, item) => {
     if (isAddonProduct(item)) return sum;
+    const isLuggage = (item.collection || '').toLowerCase().includes('luggage') || (item.category || '').toLowerCase().includes('luggage');
+    if (isLuggage) return sum;
     const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
     return isBlanket ? sum : sum + item.quantity;
   }, 0);
 
   const blanketCount = cart.reduce((sum, item) => {
     if (isAddonProduct(item)) return sum;
+    const isLuggage = (item.collection || '').toLowerCase().includes('luggage') || (item.category || '').toLowerCase().includes('luggage');
+    if (isLuggage) return sum;
     const isBlanket = !item.collection || item.collection === 'Blankets' || item.collection.toLowerCase().includes('blanket') || (item.category && item.category.toLowerCase().includes('blanket'));
     return isBlanket ? sum + item.quantity : sum;
   }, 0);
 
-  const hasAdultBlanket = cart.some(item => !isAddonProduct(item) && item.sizeOption === 'adult');
+  const hasAdultBlanket = cart.some(item => !isAddonProduct(item) && item.sizeOption === 'adult' && !((item.collection || '').toLowerCase().includes('luggage')));
 
   // Form Data
   const [email, setEmail] = useState('');
@@ -685,10 +689,22 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
                  </div>
                  <div className="flex-1 min-w-0">
                    <h4 className="font-serif text-gray-900 text-sm truncate">{item.name}</h4>
-                   <p className="text-[10px] text-gray-500 font-sans mt-0.5 uppercase tracking-wide">RM {item.price}</p>
+                   <div className="flex items-center gap-1.5 mt-0.5">
+                     <p className="text-[10px] text-gray-500 font-sans uppercase tracking-wide">RM {item.price}</p>
+                     {(() => {
+                       const isLuggage = item.productType === 'luggage-cover' || (item.collection && item.collection.toLowerCase().includes('luggage')) || (item.category && item.category.toLowerCase().includes('luggage'));
+                       if (!isLuggage) return null;
+                       const sizeLabel = item.sizeOption || (item.id.includes('-adult') ? 'Size L' : item.id.includes('-baby') ? 'Size M' : '');
+                       return sizeLabel ? (
+                         <span className="text-[9px] font-bold bg-brand-latte/20 text-gray-700 px-1.5 py-0.2 rounded">
+                           {sizeLabel}
+                         </span>
+                       ) : null;
+                     })()}
+                   </div>
                    {item.isPreOrder && (
                       <p className="text-[9px] text-brand-gold font-bold uppercase tracking-wide mt-1 flex items-center gap-1">
-                        <Clock size={10} /> Ships in 2 weeks
+                        <Clock size={10} /> {item.collection?.toLowerCase().includes('luggage') ? 'Pre-Order' : 'Ships in 2 weeks'}
                       </p>
                    )}
                  </div>
@@ -698,6 +714,13 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({ cart, onOrderSuccess
               </div>
             ))}
           </div>
+
+          {cart.some(item => item.productType === 'luggage-cover' || (item.collection && item.collection.toLowerCase().includes('luggage')) || (item.category && item.category.toLowerCase().includes('luggage'))) && (
+            <div className="mb-6 p-3 bg-amber-50/90 border border-amber-200/80 rounded-[2px] text-[10.5px] text-amber-900 leading-relaxed">
+              <strong className="block text-amber-950 font-bold mb-0.5">⚠️ Luggage Cover Policy:</strong>
+              Strictly no size replacement or exchange is accepted once ordered. Please verify suitcase dimensions.
+            </div>
+          )}
 
           <div className="bg-white border border-brand-latte/20 p-5 rounded-[2px] mb-8">
             <h4 className="font-sans text-[10px] font-bold uppercase tracking-widest text-brand-gold mb-3 flex items-center gap-2">

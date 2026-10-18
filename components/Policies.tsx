@@ -58,6 +58,13 @@ export const RefundPolicy: React.FC = () => (
     </section>
 
     <section>
+      <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-gray-900 mb-3">Luggage Covers — Strictly No Size Replacement</h3>
+      <p>
+        Suitcase measurements vary widely across manufacturers and luggage models. We provide detailed measurement guides for Size M (22"–26") and Size L (28"–32") on our product pages. Customers are strictly responsible for measuring their suitcase body height (excluding wheels), width, and depth prior to ordering. <strong>We strictly do not accept size replacements, exchanges, or returns for luggage covers due to incorrect size selection.</strong>
+      </p>
+    </section>
+
+    <section>
       <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-gray-900 mb-3">Custom Orders</h3>
       <p>
         Custom or personalized items (such as those with specific embroidery requests) are <strong>final sale</strong>. We cannot offer returns or refunds on these pieces as they are made uniquely for you.

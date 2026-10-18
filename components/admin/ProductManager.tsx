@@ -1,7 +1,9 @@
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { Product } from '../../types';
-import { Trash2, Edit2, Plus, Upload, X, Loader2, Check, Link as LinkIcon, Database, AlertTriangle, Box } from 'lucide-react';
+import { 
+  Trash2, Edit2, Plus, Upload, X, Loader2, Check, Link as LinkIcon, 
+  Database, AlertTriangle, Box, Search, Filter, ShieldAlert, Sparkles, Tag, Layers
+} from 'lucide-react';
 import { addProductToDb, updateProductInDb, deleteProductFromDb, uploadImage } from '../../firebase';
 
 interface ProductManagerProps {
@@ -16,16 +18,18 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
   const [isSeeding, setIsSeeding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
+
+  // Filter & Search states
+  const [selectedCollectionFilter, setSelectedCollectionFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'live' | 'hidden'>('all');
   
   // Refs for inputs
   const productFileInputRef = useRef<HTMLInputElement>(null);
   const additionalFileInputRef = useRef<HTMLInputElement>(null);
   const [newAdditionalUrl, setNewAdditionalUrl] = useState('');
 
-  const isPerfumeOrHairOil = (p: Product) => {
-    const name = (p.name || '').toLowerCase();
-    return name.includes('perfume') || /\bhair oil\b|\bbody oil\b|\bessential oil\b|\bperfume oil\b|\boil\b/.test(name);
-  };
+  // Classification Helpers
   const isCakenicProduct = (p: Product) => {
     if (!p) return false;
     const name = (p.name || '').toLowerCase();
@@ -33,6 +37,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     const category = (p.category || '').toLowerCase();
     const id = (p.id || '').toLowerCase();
     return Boolean(p.isCakenicOnly) || 
+           p.productType === 'ticket' ||
            name.includes('cakenic') || 
            name.includes('ticket') || 
            collection.includes('cakenic') || 
@@ -41,92 +46,318 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
            category.includes('ticket') || 
            id.includes('cakenic');
   };
+
+  const isPerfumeOrHairOil = (p: Product) => {
+    const name = (p.name || '').toLowerCase();
+    return name.includes('perfume') || /\bhair oil\b|\bbody oil\b|\bessential oil\b|\bperfume oil\b|\boil\b/.test(name);
+  };
+
   const isAddonProduct = (p: Product) => {
     if (!p) return false;
     if (isCakenicProduct(p)) return false;
     const name = (p.name || '').toLowerCase();
     const collection = (p.collection || '').toLowerCase();
     const category = (p.category || '').toLowerCase();
-    const isOilProduct = /\bhair oil\b|\bbody oil\b|\bessential oil\b|\bperfume oil\b|\boil\b/.test(name);
+    const isOilProduct = isPerfumeOrHairOil(p);
     return Boolean(p.isCheckoutAddon) || 
+           p.productType === 'addon' ||
            name.includes('perfume') || 
+           name.includes('mirror') ||
+           name.includes('signature') ||
+           name.includes('card') ||
+           name.includes('gift box') ||
            isOilProduct || 
            collection.includes('add-on') || 
            collection.includes('addon') || 
            category.includes('add-on') || 
            category.includes('addon');
   };
+
+  const isLuggageCoverProduct = (p: Product) => {
+    if (!p) return false;
+    const collection = (p.collection || '').toLowerCase();
+    const category = (p.category || '').toLowerCase();
+    return p.productType === 'luggage-cover' || 
+           collection.includes('luggage') || 
+           category.includes('luggage');
+  };
+
   const isBlanketProduct = (p: Product) => {
-    if (!p || isCakenicProduct(p) || isAddonProduct(p)) return false;
-    return !p.collection || p.collection === 'Blankets' || p.collection.toLowerCase().includes('blanket') || (p.category && p.category.toLowerCase().includes('blanket'));
+    if (!p || isCakenicProduct(p) || isAddonProduct(p) || isLuggageCoverProduct(p)) return false;
+    if (p.productType === 'blanket') return true;
+    const col = (p.collection || '').toLowerCase();
+    const cat = (p.category || '').toLowerCase();
+    return !p.collection || col === 'blankets' || col.includes('blanket') || cat.includes('blanket');
+  };
+
+  const isSwaddleProduct = (p: Product) => {
+    if (!p || isCakenicProduct(p) || isAddonProduct(p) || isLuggageCoverProduct(p) || isBlanketProduct(p)) return false;
+    if (p.productType === 'swaddle') return true;
+    const col = (p.collection || '').toLowerCase();
+    const cat = (p.category || '').toLowerCase();
+    return col.includes('swaddle') || cat.includes('swaddle');
+  };
+
+  const getCollectionBadge = (p: Product) => {
+    if (isCakenicProduct(p)) {
+      return { label: 'Event Ticket', icon: '🎟️', style: 'bg-rose-100 text-rose-800 border-rose-200' };
+    }
+    if (isLuggageCoverProduct(p)) {
+      return { label: 'Luggage Cover', icon: '🧳', style: 'bg-amber-100 text-amber-800 border-amber-300 font-semibold' };
+    }
+    if (isAddonProduct(p)) {
+      return { label: 'Add-on', icon: '💝', style: 'bg-purple-100 text-purple-700 border-purple-200' };
+    }
+    if (isBlanketProduct(p)) {
+      return { label: 'Blanket', icon: '🧸', style: 'bg-brand-gold/15 text-brand-gold border-brand-gold/30' };
+    }
+    return { label: 'Swaddle', icon: '🌸', style: 'bg-brand-flamingo/15 text-brand-flamingo border-brand-flamingo/30' };
   };
 
   const rawProducts = Array.isArray(products) ? products : [];
-  const safeProducts = [...rawProducts].sort((a, b) => {
-    const aIsCakenic = isCakenicProduct(a);
-    const bIsCakenic = isCakenicProduct(b);
-    const aIsPerfumeOrOil = isPerfumeOrHairOil(a);
-    const bIsPerfumeOrOil = isPerfumeOrHairOil(b);
-    const aIsAddon = isAddonProduct(a);
-    const bIsAddon = isAddonProduct(b);
-    const aIsBlanket = isBlanketProduct(a);
-    const bIsBlanket = isBlanketProduct(b);
+  
+  // Priority ordering by group: Blankets (0), Swaddles (1), Luggage Cover (2), Add-ons (3), Events (4)
+  const safeProducts = useMemo(() => {
+    return [...rawProducts].sort((a, b) => {
+      const getScore = (p: Product) => {
+        if (isBlanketProduct(p)) return 0;
+        if (isSwaddleProduct(p)) return 1;
+        if (isLuggageCoverProduct(p)) return 2;
+        if (isAddonProduct(p)) return 3;
+        if (isCakenicProduct(p)) return 4;
+        return 5;
+      };
+      const diff = getScore(a) - getScore(b);
+      if (diff !== 0) return diff;
 
-    const aGroup = aIsCakenic ? 0 : (aIsBlanket ? 1 : (aIsAddon ? 3 : 2));
-    const bGroup = bIsCakenic ? 0 : (bIsBlanket ? 1 : (bIsAddon ? 3 : 2));
+      // Luggage cover custom order: Parisian, Jubilee Carousel, Dream Castle, Balloon Ride
+      if (isLuggageCoverProduct(a) && isLuggageCoverProduct(b)) {
+        const getLuggagePriority = (name: string) => {
+          const lower = (name || '').toLowerCase();
+          if (lower.includes('parisian') || lower.includes('flight')) return 0;
+          if (lower.includes('carousel') || lower.includes('jubilee')) return 1;
+          if (lower.includes('castle') || lower.includes('dream')) return 2;
+          if (lower.includes('balloon') || lower.includes('whimsy')) return 3;
+          return 4;
+        };
+        const lpA = getLuggagePriority(a.name || '');
+        const lpB = getLuggagePriority(b.name || '');
+        if (lpA !== lpB) return lpA - lpB;
+      }
 
-    if (aGroup !== bGroup) {
-      return aGroup - bGroup;
-    }
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [rawProducts]);
 
-    return (a.name || '').localeCompare(b.name || '');
-  });
-  const existingCollections = Array.from(new Set(safeProducts.map(p => p.collection || 'Blankets'))).sort();
-  const existingCategories = Array.from(new Set(safeProducts.map(p => p.category).filter(Boolean))).sort() as string[];
+  // Dynamic collections from existing products
+  const existingCollections = useMemo(() => {
+    const set = new Set<string>();
+    // Canonical default collections
+    set.add('Luggage Cover');
+    set.add('Blankets');
+    set.add('Swaddle');
+    set.add('Add-ons');
+    set.add('Cakenic 2026');
+    safeProducts.forEach(p => {
+      if (p.collection && p.collection.trim()) {
+        set.add(p.collection.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [safeProducts]);
+
+  const existingCategories = useMemo(() => {
+    const set = new Set<string>(['Luggage Cover', 'Blankets', 'Swaddle', 'Add-on', 'Event Ticket']);
+    safeProducts.forEach(p => {
+      if (p.category && p.category.trim()) set.add(p.category.trim());
+    });
+    return Array.from(set).sort();
+  }, [safeProducts]);
+
+  // Counts for each collection tab
+  const counts = useMemo(() => {
+    return {
+      all: safeProducts.length,
+      luggage: safeProducts.filter(isLuggageCoverProduct).length,
+      blankets: safeProducts.filter(isBlanketProduct).length,
+      swaddles: safeProducts.filter(isSwaddleProduct).length,
+      addons: safeProducts.filter(isAddonProduct).length,
+      events: safeProducts.filter(isCakenicProduct).length,
+    };
+  }, [safeProducts]);
+
+  // Filtered Products
+  const filteredProducts = useMemo(() => {
+    return safeProducts.filter(product => {
+      // 1. Collection Filter
+      if (selectedCollectionFilter !== 'all') {
+        const sel = selectedCollectionFilter.toLowerCase();
+        if (sel === 'luggage cover' || sel === 'luggage-cover') {
+          if (!isLuggageCoverProduct(product)) return false;
+        } else if (sel === 'blankets' || sel === 'blanket') {
+          if (!isBlanketProduct(product)) return false;
+        } else if (sel === 'swaddle' || sel === 'swaddles') {
+          if (!isSwaddleProduct(product)) return false;
+        } else if (sel === 'add-ons' || sel === 'addon' || sel === 'add-on') {
+          if (!isAddonProduct(product)) return false;
+        } else if (sel.includes('cakenic') || sel === 'events') {
+          if (!isCakenicProduct(product)) return false;
+        } else {
+          // Exact collection match fallback
+          if ((product.collection || '').toLowerCase() !== sel) return false;
+        }
+      }
+
+      // 2. Status Filter
+      if (statusFilter === 'live' && product.isLive === false) return false;
+      if (statusFilter === 'hidden' && product.isLive !== false) return false;
+
+      // 3. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const nameMatch = (product.name || '').toLowerCase().includes(q);
+        const skuMatch = (product.sku || '').toLowerCase().includes(q);
+        const designMatch = (product.designName || '').toLowerCase().includes(q);
+        const colMatch = (product.collection || '').toLowerCase().includes(q);
+        const catMatch = (product.category || '').toLowerCase().includes(q);
+        if (!nameMatch && !skuMatch && !designMatch && !colMatch && !catMatch) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [safeProducts, selectedCollectionFilter, statusFilter, searchQuery]);
 
   // Form State
   const [formData, setFormData] = useState<Product>({
     id: '',
     name: '',
-    price: 0,
+    price: 88,
     description: '',
     image: '',
     additionalImages: [],
-    badge: '',
+    badge: 'Pre-Order',
     material: '',
     care: '',
-    collection: 'Blankets',
-    category: '',
-    size: '',
+    collection: 'Luggage Cover',
+    category: 'Luggage Cover',
+    size: 'Size M: 22"–26" / Size L: 28"–32"',
     stock: 0,
-    hasSizes: false,
+    hasSizes: true,
     babyPrice: 88,
     adultPrice: 108,
-    babySizeDesc: '70 cm x 100 cm',
-    adultSizeDesc: '150 cm x 100 cm',
+    babySizeDesc: 'Size M: 22" – 26" Luggage',
+    adultSizeDesc: 'Size L: 28" – 32" Luggage',
     isCheckoutAddon: false,
     isPosOnly: false,
     isCakenicOnly: false,
-    isLive: true
+    isLive: true,
+    sku: '',
+    designName: '',
+    productType: 'luggage-cover',
+    noSizeReplacement: true,
   });
 
+  const applyCollectionPreset = (type: 'luggage' | 'blanket' | 'swaddle' | 'addon' | 'cakenic') => {
+    if (type === 'luggage') {
+      setFormData(prev => ({
+        ...prev,
+        collection: 'Luggage Cover',
+        category: 'Luggage Cover',
+        productType: 'luggage-cover',
+        hasSizes: true,
+        price: 88,
+        babyPrice: 88,
+        adultPrice: 108,
+        babySizeDesc: 'Size M: 22" – 26" Luggage',
+        adultSizeDesc: 'Size L: 28" – 32" Luggage',
+        size: 'Size M: 22"–26" / Size L: 28"–32"',
+        badge: 'Pre-Order',
+        noSizeReplacement: true,
+        material: 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.',
+        care: 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.',
+        sku: prev.sku || (prev.name ? `LC-${prev.name.toUpperCase().replace(/\s+/g, '-')}` : 'LC-')
+      }));
+    } else if (type === 'blanket') {
+      setFormData(prev => ({
+        ...prev,
+        collection: 'Blankets',
+        category: 'Blankets',
+        productType: 'blanket',
+        hasSizes: true,
+        price: 185,
+        babyPrice: 185,
+        adultPrice: 225,
+        babySizeDesc: '120 cm x 120 cm',
+        adultSizeDesc: '150 cm x 150 cm',
+        size: '120cm x 120cm',
+        noSizeReplacement: false,
+        material: '100% Grade-A Mongolian Cashmere',
+        care: 'Dry clean recommended. Hand wash cold with gentle detergent. Lay flat to dry.',
+        sku: prev.sku || (prev.name ? `BL-${prev.name.toUpperCase().replace(/\s+/g, '-')}` : 'BL-')
+      }));
+    } else if (type === 'swaddle') {
+      setFormData(prev => ({
+        ...prev,
+        collection: 'Swaddle',
+        category: 'Swaddle',
+        productType: 'swaddle',
+        hasSizes: false,
+        price: 88,
+        size: '120cm x 120cm',
+        noSizeReplacement: false,
+        material: '70% Bamboo, 30% Organic Cotton',
+        care: 'Machine wash delicate cycle in laundry bag. Tumble dry low.',
+        sku: prev.sku || (prev.name ? `SW-${prev.name.toUpperCase().replace(/\s+/g, '-')}` : 'SW-')
+      }));
+    } else if (type === 'addon') {
+      setFormData(prev => ({
+        ...prev,
+        collection: 'Add-ons',
+        category: 'Add-on',
+        productType: 'addon',
+        hasSizes: false,
+        isCheckoutAddon: true,
+        noSizeReplacement: false,
+        sku: prev.sku || (prev.name ? `ADD-${prev.name.toUpperCase().replace(/\s+/g, '-')}` : 'ADD-')
+      }));
+    } else if (type === 'cakenic') {
+      setFormData(prev => ({
+        ...prev,
+        collection: 'Cakenic 2026',
+        category: 'Event Ticket',
+        productType: 'ticket',
+        hasSizes: false,
+        isCakenicOnly: true,
+        noSizeReplacement: false,
+        sku: prev.sku || (prev.name ? `TIK-${prev.name.toUpperCase().replace(/\s+/g, '-')}` : 'TIK-')
+      }));
+    }
+  };
+
   const handleEdit = (product: Product) => {
+    const isLuggage = isLuggageCoverProduct(product);
     setFormData({
-        ...product,
-        collection: product.collection || 'Blankets',
-        category: product.category || '',
-        additionalImages: product.additionalImages || [],
-        size: product.size || '',
-        stock: product.stock !== undefined ? product.stock : 0,
-        hasSizes: product.hasSizes || false,
-        babyPrice: product.babyPrice !== undefined ? product.babyPrice : 88,
-        adultPrice: product.adultPrice !== undefined ? product.adultPrice : 108,
-        babySizeDesc: product.babySizeDesc || '70 cm x 100 cm',
-        adultSizeDesc: product.adultSizeDesc || '150 cm x 100 cm',
-        isCheckoutAddon: product.isCheckoutAddon || false,
-        isPosOnly: product.isPosOnly || false,
-        isCakenicOnly: product.isCakenicOnly || false,
-        isLive: product.isLive !== undefined ? product.isLive : true
+      ...product,
+      collection: product.collection || (isLuggage ? 'Luggage Cover' : 'Blankets'),
+      category: product.category || (isLuggage ? 'Luggage Cover' : ''),
+      additionalImages: product.additionalImages || [],
+      size: product.size || (isLuggage ? 'Size M: 22"–26" / Size L: 28"–32"' : ''),
+      stock: product.stock !== undefined ? product.stock : 0,
+      hasSizes: product.hasSizes !== undefined ? product.hasSizes : isLuggage,
+      babyPrice: product.babyPrice !== undefined ? product.babyPrice : (isLuggage ? 88 : 88),
+      adultPrice: product.adultPrice !== undefined ? product.adultPrice : (isLuggage ? 108 : 108),
+      babySizeDesc: product.babySizeDesc || (isLuggage ? 'Size M: 22" – 26" Luggage' : '70 cm x 100 cm'),
+      adultSizeDesc: product.adultSizeDesc || (isLuggage ? 'Size L: 28" – 32" Luggage' : '150 cm x 100 cm'),
+      isCheckoutAddon: product.isCheckoutAddon || false,
+      isPosOnly: product.isPosOnly || false,
+      isCakenicOnly: product.isCakenicOnly || false,
+      isLive: product.isLive !== undefined ? product.isLive : true,
+      sku: product.sku || '',
+      designName: product.designName || product.name || '',
+      productType: product.productType || (isLuggage ? 'luggage-cover' : isBlanketProduct(product) ? 'blanket' : isSwaddleProduct(product) ? 'swaddle' : isAddonProduct(product) ? 'addon' : 'other'),
+      noSizeReplacement: product.noSizeReplacement !== undefined ? product.noSizeReplacement : isLuggage
     });
     setEditingProduct(product);
     setIsEditing(true);
@@ -135,30 +366,39 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     setNewAdditionalUrl('');
   };
 
-  const handleCreate = () => {
+  const handleCreate = (defaultCollection: string = 'Luggage Cover') => {
+    const isLuggage = defaultCollection.toLowerCase().includes('luggage');
     setFormData({
       id: '',
       name: '',
-      price: 0,
+      price: isLuggage ? 88 : 185,
       description: '',
       image: '',
       additionalImages: [],
-      badge: '',
-      material: '',
-      care: '',
-      collection: 'Blankets',
-      category: '',
-      size: '',
+      badge: isLuggage ? 'Pre-Order' : '',
+      material: isLuggage 
+        ? 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.' 
+        : '',
+      care: isLuggage 
+        ? 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.' 
+        : '',
+      collection: defaultCollection,
+      category: defaultCollection,
+      size: isLuggage ? 'Size M: 22"–26" / Size L: 28"–32"' : '',
       stock: 0,
-      hasSizes: false,
-      babyPrice: 88,
-      adultPrice: 108,
-      babySizeDesc: '70 cm x 100 cm',
-      adultSizeDesc: '150 cm x 100 cm',
+      hasSizes: isLuggage,
+      babyPrice: isLuggage ? 88 : 185,
+      adultPrice: isLuggage ? 108 : 225,
+      babySizeDesc: isLuggage ? 'Size M: 22" – 26" Luggage' : '70 cm x 100 cm',
+      adultSizeDesc: isLuggage ? 'Size L: 28" – 32" Luggage' : '150 cm x 100 cm',
       isCheckoutAddon: false,
       isPosOnly: false,
       isCakenicOnly: false,
-      isLive: true
+      isLive: true,
+      sku: '',
+      designName: '',
+      productType: isLuggage ? 'luggage-cover' : 'blanket',
+      noSizeReplacement: isLuggage
     });
     setEditingProduct(null);
     setIsEditing(true);
@@ -195,40 +435,143 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
   const handleSeedData = async () => {
     setIsSeeding(true);
     const SEED_DATA = [
+      // 4 Luggage Covers (Sorted: Parisian Flight, Jubilee Carousel, Dream Castle, Balloon Ride)
+      {
+        name: 'The Parisian Flight',
+        designName: 'The Parisian Flight',
+        sku: 'LC-THE-PARISIAN-FLIGHT',
+        productType: 'luggage-cover',
+        collection: 'Luggage Cover',
+        category: 'Luggage Cover',
+        price: 88,
+        stock: 50,
+        badge: 'Pre-Order',
+        hasSizes: true,
+        babyPrice: 88,
+        adultPrice: 108,
+        babySizeDesc: 'Size M: 22" – 26" Luggage',
+        adultSizeDesc: 'Size L: 28" – 32" Luggage',
+        size: 'Size M: 22"–26" / Size L: 28"–32"',
+        noSizeReplacement: true,
+        description: 'A majestic voyage begins. Drift into new adventures with vintage hot-air balloons soaring over Parisian rooftops. Once Upon a Traveller — New places, same dreams, together.',
+        material: 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.',
+        care: 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.',
+        image: 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792298424226_The_Parisian_Flight_luggage_artwork.png?alt=media&token=407936c3-559b-4c6a-9dd3-ad356979f1da',
+        isLive: true
+      },
+      {
+        name: 'The Jubilee Carousel',
+        designName: 'The Jubilee Carousel',
+        sku: 'LC-THE-JUBILEE-CAROUSEL',
+        productType: 'luggage-cover',
+        collection: 'Luggage Cover',
+        category: 'Luggage Cover',
+        price: 88,
+        stock: 50,
+        badge: 'Pre-Order',
+        hasSizes: true,
+        babyPrice: 88,
+        adultPrice: 108,
+        babySizeDesc: 'Size M: 22" – 26" Luggage',
+        adultSizeDesc: 'Size L: 28" – 32" Luggage',
+        size: 'Size M: 22"–26" / Size L: 28"–32"',
+        noSizeReplacement: true,
+        description: 'A timeless celebration in motion. Beneath an elegantly adorned canopy, The Bear leads his companions on a joyous carnival ride, bringing nostalgic charm and storybook wonder to every airport terminal.',
+        material: 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.',
+        care: 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.',
+        image: 'https://i.postimg.cc/xCdvjk4J/hf-20260621-132500-877d6234-2046-4040-be9d-df84527273c7.png',
+        isLive: true
+      },
       {
         name: 'The Dream Castle',
+        designName: 'The Dream Castle',
+        sku: 'LC-THE-DREAM-CASTLE',
+        productType: 'luggage-cover',
+        collection: 'Luggage Cover',
+        category: 'Luggage Cover',
+        price: 88,
+        stock: 50,
+        badge: 'Pre-Order',
+        hasSizes: true,
+        babyPrice: 88,
+        adultPrice: 108,
+        babySizeDesc: 'Size M: 22" – 26" Luggage',
+        adultSizeDesc: 'Size L: 28" – 32" Luggage',
+        size: 'Size M: 22"–26" / Size L: 28"–32"',
+        noSizeReplacement: true,
+        description: 'A royal kingdom of imagination floating in the clouds. Subtle turret details and starry accents shield your luggage in fairytale elegance on every expedition.',
+        material: 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.',
+        care: 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.',
+        image: 'https://i.postimg.cc/NGZkTM36/0ekjb3nj55rmt0cw35dbhcxvym.png',
+        isLive: true
+      },
+      {
+        name: 'The Balloon Ride',
+        designName: 'The Balloon Ride',
+        sku: 'LC-THE-BALLOON-RIDE',
+        productType: 'luggage-cover',
+        collection: 'Luggage Cover',
+        category: 'Luggage Cover',
+        price: 88,
+        stock: 50,
+        badge: 'Pre-Order',
+        hasSizes: true,
+        babyPrice: 88,
+        adultPrice: 108,
+        babySizeDesc: 'Size M: 22" – 26" Luggage',
+        adultSizeDesc: 'Size L: 28" – 32" Luggage',
+        size: 'Size M: 22"–26" / Size L: 28"–32"',
+        noSizeReplacement: true,
+        description: 'Rising gently above the sleeping rooftops. Holding fast to silken ropes, The Bear and companions drift past chimney tops and morning clouds, watching the town grow small and golden below.',
+        material: 'High-Elasticity Spandex & Polyester Blend. Heavy-duty, tear-resistant, dust-proof & scratch-resistant travel cover with dual-top handle openings, side handle access, and secure bottom zipper with buckle strap.',
+        care: 'Machine wash in laundry wash bag on delicate/cold cycle. Hang flat to dry. Do not bleach or iron directly over printed artwork.',
+        image: 'https://i.postimg.cc/k4wMZ8wp/The-Whimsy-Fair-Blanket-(Website).png',
+        isLive: true
+      },
+      // Blankets
+      {
+        name: 'The Dream Castle',
+        designName: 'The Dream Castle',
+        sku: 'BL-THE-DREAM-CASTLE',
+        productType: 'blanket',
         price: 185,
         description: 'An intricate illustration of a whimsical palace in the clouds. Woven from the finest cashmere, this piece features subtle turret details and starry accents.',
         image: 'https://i.postimg.cc/9QVBP1b5/Gemini-Generated-Image-s2ybu4s2ybu4s2yb.png',
         material: '100% Grade-A Mongolian Cashmere',
         care: 'Dry clean recommended. Hand wash cold with gentle detergent. Lay flat to dry.',
         collection: 'Blankets',
+        category: 'Blankets',
         size: '120cm x 120cm',
-        additionalImages: [],
         stock: 50,
         hasSizes: true,
         babyPrice: 185,
         babySizeDesc: '120 cm x 120 cm',
         adultPrice: 225,
-        adultSizeDesc: '150 cm x 150 cm'
+        adultSizeDesc: '150 cm x 150 cm',
+        isLive: true
       },
       {
         name: 'The Parisian Flight',
+        designName: 'The Parisian Flight',
+        sku: 'BL-THE-PARISIAN-FLIGHT',
+        productType: 'blanket',
         price: 145,
         description: 'A majestic voyage begins. Vintage hot air balloons drifting over Parisian rooftops. A delicate blend of organic cotton and silk, finished with a refined latte border.',
         image: 'https://picsum.photos/seed/vintage-balloon/600/800',
         material: '80% Organic Cotton, 20% Mulberry Silk',
         care: 'Machine wash delicate cycle in laundry bag. Tumble dry low.',
         collection: 'Blankets',
+        category: 'Blankets',
         size: '110cm x 110cm',
-        additionalImages: [],
         stock: 50,
         hasSizes: true,
         babyPrice: 145,
         babySizeDesc: '110 cm x 110 cm',
         adultPrice: 185,
-        adultSizeDesc: '150 cm x 150 cm'
+        adultSizeDesc: '150 cm x 150 cm',
+        isLive: true
       },
+      // Tickets
       {
         id: 'cakenic-ticket-putrajaya',
         name: 'Cakenic Putrajaya',
@@ -237,8 +580,10 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         image: 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
         collection: 'Cakenic Ticket',
+        productType: 'ticket',
         isCakenicOnly: true,
-        stock: 45
+        stock: 45,
+        isLive: true
       },
       {
         id: 'cakenic-ticket-johor',
@@ -248,8 +593,10 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
         image: 'https://images.unsplash.com/photo-1535141192574-5d4897c13136?auto=format&fit=crop&w=800&q=80',
         category: 'Event Ticket',
         collection: 'Cakenic Ticket',
+        productType: 'ticket',
         isCakenicOnly: true,
-        stock: 30
+        stock: 30,
+        isLive: true
       }
     ];
 
@@ -257,7 +604,7 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
       for (const data of SEED_DATA) {
         await addProductToDb(data as any);
       }
-      alert("Sample data uploaded successfully! The products should appear shortly.");
+      alert("Sample catalog uploaded successfully! Products will appear shortly.");
     } catch (error: any) {
       console.error("Seed Error:", error);
       alert(`Error uploading data: ${error.message}`);
@@ -272,11 +619,21 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     setErrorMessage('');
     
     try {
+      const isLuggage = formData.collection?.toLowerCase().includes('luggage') || formData.productType === 'luggage-cover';
+      const cleanData: any = {
+        ...formData,
+        collection: formData.collection?.trim() || 'Blankets',
+        category: formData.category?.trim() || (isLuggage ? 'Luggage Cover' : ''),
+        designName: formData.designName?.trim() || formData.name?.trim(),
+        productType: formData.productType || (isLuggage ? 'luggage-cover' : 'blanket'),
+        noSizeReplacement: Boolean(formData.noSizeReplacement || isLuggage),
+      };
+
       if (editingProduct && editingProduct.id) {
-        const { id, ...data } = formData;
+        const { id, ...data } = cleanData;
         await updateProductInDb(id, data);
       } else {
-        const { id, ...data } = formData;
+        const { id, ...data } = cleanData;
         await addProductToDb(data);
       }
       setSaveStatus('saved');
@@ -336,34 +693,156 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     }));
   };
 
+  const isCurrentFormLuggage = formData.collection?.toLowerCase().includes('luggage') || formData.productType === 'luggage-cover';
+
   return (
     <>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Product Management</h2>
-        <button 
-          onClick={handleCreate}
-          className="w-full md:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded-[2px]"
-        >
-          <Plus size={14} /> Add Product
-        </button>
+      {/* Top Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h2 className="font-serif text-2xl md:text-3xl text-gray-900">Product Management</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            Organize catalog, distinguish blankets & luggage cover design collections, manage sizes and stock.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
+          <button 
+            onClick={() => handleCreate(selectedCollectionFilter === 'all' ? 'Luggage Cover' : selectedCollectionFilter)}
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded-[2px] shadow-sm"
+          >
+            <Plus size={14} /> Add Product
+          </button>
+        </div>
       </div>
 
       {isEditing ? (
-        <div className="bg-white p-6 md:p-8 border border-brand-latte/20 shadow-sm animate-fade-in max-w-2xl mx-auto rounded-[2px]">
-            <h3 className="font-serif text-xl md:text-2xl mb-6">{editingProduct ? 'Edit Product' : 'New Product'}</h3>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-5 md:gap-6">
+        /* Edit / Create Form View */
+        <div className="bg-white p-6 md:p-8 border border-brand-latte/20 shadow-sm animate-fade-in max-w-3xl mx-auto rounded-[2px]">
+          <div className="flex items-center justify-between border-b border-brand-latte/20 pb-4 mb-6">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-gold">Product Editor</span>
+              <h3 className="font-serif text-xl md:text-2xl text-gray-900">
+                {editingProduct ? `Edit: ${editingProduct.name}` : 'Create New Product'}
+              </h3>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsEditing(false)}
+              className="text-gray-400 hover:text-gray-700 p-1"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Quick Collection Preset Buttons */}
+          <div className="mb-6 bg-brand-grey/5 p-4 rounded border border-brand-latte/20">
+            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+              ⚡ Quick Collection Presets (Auto-fills pricing, specs & sizing):
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => applyCollectionPreset('luggage')}
+                className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                  isCurrentFormLuggage 
+                    ? 'bg-amber-100 text-amber-800 border-amber-400 ring-2 ring-amber-300' 
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-amber-400 hover:bg-amber-50'
+                }`}
+              >
+                <span>🧳</span> Luggage Cover (Pre-Order)
+              </button>
+              <button
+                type="button"
+                onClick={() => applyCollectionPreset('blanket')}
+                className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                  formData.collection?.toLowerCase().includes('blanket')
+                    ? 'bg-brand-gold/15 text-brand-gold border-brand-gold ring-2 ring-brand-gold/30'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-brand-gold hover:bg-brand-gold/5'
+                }`}
+              >
+                <span>🧸</span> Blankets
+              </button>
+              <button
+                type="button"
+                onClick={() => applyCollectionPreset('swaddle')}
+                className={`px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border ${
+                  formData.collection?.toLowerCase().includes('swaddle')
+                    ? 'bg-brand-flamingo/15 text-brand-flamingo border-brand-flamingo ring-2 ring-brand-flamingo/30'
+                    : 'bg-white text-gray-700 border-gray-300 hover:border-brand-flamingo hover:bg-brand-flamingo/5'
+                }`}
+              >
+                <span>🌸</span> Swaddle
+              </button>
+              <button
+                type="button"
+                onClick={() => applyCollectionPreset('addon')}
+                className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border bg-white text-gray-700 border-gray-300 hover:border-purple-300 hover:bg-purple-50"
+              >
+                <span>💝</span> Add-on
+              </button>
+              <button
+                type="button"
+                onClick={() => applyCollectionPreset('cakenic')}
+                className="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 border bg-white text-gray-700 border-gray-300 hover:border-rose-300 hover:bg-rose-50"
+              >
+                <span>🎟️</span> Cakenic Ticket
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5 md:gap-6">
+            {/* Name & Design Name distinction */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Product Name</label>
-                <input required className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Collection</label>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Product Display Name <span className="text-red-500">*</span>
+                </label>
                 <input 
-                  list="collection-options"
+                  required 
                   className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" 
+                  value={formData.name} 
+                  onChange={e => {
+                    const name = e.target.value;
+                    setFormData(prev => ({
+                      ...prev, 
+                      name,
+                      designName: prev.designName || name
+                    }));
+                  }} 
+                  placeholder="e.g. The Dream Castle"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <span>Design Artwork Name (For DB Distinction)</span>
+                  <span className="text-gray-400 font-normal text-[9px] lowercase">(e.g. shared artwork)</span>
+                </label>
+                <input 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" 
+                  value={formData.designName || ''} 
+                  onChange={e => setFormData({...formData, designName: e.target.value})}
+                  placeholder="e.g. The Dream Castle"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Keeps blankets and luggage covers distinguished cleanly in Firestore even if they share the same title.
+                </p>
+              </div>
+            </div>
+
+            {/* Collection & SKU */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Collection <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  required
+                  list="collection-options"
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-medium" 
                   value={formData.collection || ''} 
                   onChange={e => setFormData({...formData, collection: e.target.value})}
-                  placeholder="Select or type a new collection..."
+                  placeholder="e.g. Luggage Cover"
                 />
                 <datalist id="collection-options">
                   {existingCollections.map(c => <option key={c} value={c} />)}
@@ -371,313 +850,829 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Category (Optional)</label>
-                <input 
-                  list="category-options"
-                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" 
-                  value={formData.category || ''} 
-                  onChange={e => setFormData({...formData, category: e.target.value})}
-                  placeholder="e.g. Add-on, Gift Box, Apparel"
-                />
-                <datalist id="category-options">
-                  {existingCategories.map(c => <option key={c} value={c} />)}
-                </datalist>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  Product Type
+                </label>
+                <select
+                  value={formData.productType || 'luggage-cover'}
+                  onChange={e => setFormData({...formData, productType: e.target.value as any})}
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-medium"
+                >
+                  <option value="luggage-cover">Luggage Cover</option>
+                  <option value="blanket">Blanket</option>
+                  <option value="swaddle">Swaddle</option>
+                  <option value="addon">Add-on Item</option>
+                  <option value="ticket">Event Ticket</option>
+                  <option value="other">Other</option>
+                </select>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Price (RM)</label>
-                  <input required type="number" className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
-                </div>
-                  <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Stock Quantity</label>
-                  <input required type="number" min="0" className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.stock} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Badge (Optional)</label>
-                  <input className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" placeholder="e.g. New" value={formData.badge} onChange={e => setFormData({...formData, badge: e.target.value})} />
-                </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-2">
+                  SKU (Unique Identifier)
+                </label>
+                <input 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono text-xs uppercase" 
+                  value={formData.sku || ''} 
+                  onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})}
+                  placeholder="e.g. LC-THE-DREAM-CASTLE"
+                />
+              </div>
+            </div>
+
+            {/* Pricing, Stock, Badge */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
+                  Base Price (RM) <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  required 
+                  type="number" 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono" 
+                  value={formData.price} 
+                  onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Stock Quantity</label>
+                <input 
+                  required 
+                  type="number" 
+                  min="0" 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono" 
+                  value={formData.stock} 
+                  onChange={e => setFormData({...formData, stock: Number(e.target.value)})} 
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Badge</label>
+                <input 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" 
+                  placeholder="e.g. Pre-Order, New, Bestseller" 
+                  value={formData.badge || ''} 
+                  onChange={e => setFormData({...formData, badge: e.target.value})} 
+                />
+              </div>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
+              <textarea 
+                required 
+                rows={3} 
+                className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 leading-relaxed" 
+                value={formData.description} 
+                onChange={e => setFormData({...formData, description: e.target.value})} 
+              />
+            </div>
+            
+            {/* Material & Size */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Material</label>
+                <input 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 text-xs" 
+                  value={formData.material || ''} 
+                  onChange={e => setFormData({...formData, material: e.target.value})} 
+                  placeholder="e.g. High-Elasticity Spandex & Polyester Blend"
+                />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Description</label>
-                <textarea required rows={3} className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Default Size / Dimensions Label</label>
+                <input 
+                  className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 text-xs" 
+                  placeholder="e.g. Size M: 22''–26'' / Size L: 28''–32''" 
+                  value={formData.size || ''} 
+                  onChange={e => setFormData({...formData, size: e.target.value})} 
+                />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Material</label>
-                      <input className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.material || ''} onChange={e => setFormData({...formData, material: e.target.value})} />
-                  </div>
-                  <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Default Size / Dimensions</label>
-                      <input className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" placeholder="e.g. 120cm x 120cm" value={formData.size || ''} onChange={e => setFormData({...formData, size: e.target.value})} />
-                  </div>
-              </div>
+            </div>
 
-              {/* Sizing Options Config */}
-              <div className="mt-2 p-4 border border-brand-latte/30 bg-white rounded-[2px] flex flex-col gap-4">
-                <div>
-                  <label className="flex items-center gap-2 text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.isLive !== false} onChange={e => setFormData({...formData, isLive: e.target.checked})} className="accent-brand-flamingo w-4 h-4" />
-                    Product is Live on Website
-                  </label>
-                  <p className="text-[10px] text-gray-500 mb-2">If disabled, this product will be hidden from online store visitors.</p>
-                </div>
-                <div className="border-t border-brand-latte/20 pt-4">
-                  <label className="flex items-center gap-2 text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.isPosOnly} onChange={e => setFormData({...formData, isPosOnly: e.target.checked})} className="accent-brand-flamingo w-4 h-4" />
-                    Set as POS Only
-                  </label>
-                  <p className="text-[10px] text-gray-500 mb-2">If enabled, this product will not be shown in the online store.</p>
-                </div>
-                <div className="border-t border-brand-latte/20 pt-4">
-                  <label className="flex items-center gap-2 text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.isCheckoutAddon} onChange={e => setFormData({...formData, isCheckoutAddon: e.target.checked})} className="accent-brand-flamingo w-4 h-4" />
-                    Set as Checkout Add-On
-                  </label>
-                  <p className="text-[10px] text-gray-500 mb-2">If enabled, this product will be recommended during checkout for users to add to their order.</p>
-                </div>
-                <div className="border-t border-brand-latte/20 pt-4">
-                  <label className="flex items-center gap-2 text-[10px] font-bold text-gray-900 uppercase tracking-wider mb-2 cursor-pointer">
-                    <input type="checkbox" checked={formData.hasSizes} onChange={e => setFormData({...formData, hasSizes: e.target.checked})} className="accent-brand-flamingo w-4 h-4" />
-                    Enable Baby & Adult Sizing
-                  </label>
-                  <p className="text-[10px] text-gray-500 mb-4">If enabled, customers will choose between baby and adult sizes instead of the default size and price.</p>
-                  
-                  {formData.hasSizes && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-brand-latte/20">
-                    <div className="bg-brand-grey/5 p-4 rounded-[2px] border border-brand-latte/10">
-                      <p className="text-xs font-bold mb-3 text-gray-900 border-b border-brand-latte/20 pb-2">Baby Variant</p>
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RM)</label>
-                          <input type="number" className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" value={formData.babyPrice} onChange={e => setFormData({...formData, babyPrice: Number(e.target.value)})} />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dimensions</label>
-                          <input className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" value={formData.babySizeDesc} onChange={e => setFormData({...formData, babySizeDesc: e.target.value})} />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-brand-grey/5 p-4 rounded-[2px] border border-brand-latte/10">
-                      <p className="text-xs font-bold mb-3 text-gray-900 border-b border-brand-latte/20 pb-2">Adult Variant</p>
-                      <div className="flex flex-col gap-3">
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RM)</label>
-                          <input type="number" className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" value={formData.adultPrice} onChange={e => setFormData({...formData, adultPrice: Number(e.target.value)})} />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dimensions</label>
-                          <input className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" value={formData.adultSizeDesc} onChange={e => setFormData({...formData, adultSizeDesc: e.target.value})} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                </div>
-              </div>
-
-              {/* Cakenic Website Only Toggle */}
-              <div className="bg-amber-50/70 border border-amber-200 p-3.5 rounded-[2px] flex items-center gap-3">
+            {/* STRICT NO SIZE REPLACEMENT POLICY CONFIG (Key feature for Luggage Covers) */}
+            <div className={`p-4 rounded border transition-all ${
+              formData.noSizeReplacement 
+                ? 'bg-amber-50/80 border-amber-300' 
+                : 'bg-brand-grey/5 border-brand-latte/20'
+            }`}>
+              <label className="flex items-start gap-3 cursor-pointer">
                 <input 
                   type="checkbox" 
-                  id="isCakenicOnly"
-                  checked={formData.isCakenicOnly || false} 
-                  onChange={e => setFormData({...formData, isCakenicOnly: e.target.checked})} 
-                  className="w-4 h-4 text-brand-flamingo focus:ring-brand-flamingo rounded border-gray-300 cursor-pointer"
+                  checked={Boolean(formData.noSizeReplacement)} 
+                  onChange={e => setFormData({...formData, noSizeReplacement: e.target.checked})} 
+                  className="accent-brand-flamingo w-4 h-4 mt-0.5" 
                 />
                 <div>
-                  <label htmlFor="isCakenicOnly" className="text-xs font-bold text-gray-900 cursor-pointer block">
-                    Cakenic Website Only (Exclude from Main Store Listing)
-                  </label>
-                  <p className="text-[10px] text-gray-500">
-                    When checked, this product/ticket will only be visible on the Cakenic Event pages and hidden from the main website shop catalog.
+                  <span className="text-xs font-bold text-gray-900 block flex items-center gap-1.5">
+                    <ShieldAlert size={14} className="text-amber-600" />
+                    Strictly No Size Replacement Policy (Luggage Covers & Custom Sized Items)
+                  </span>
+                  <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                    When checked, customers are explicitly reminded to measure their suitcase (height, width, depth) before purchasing, and warnings are clearly shown in the size picker, product page, cart, and checkout confirming that size replacements are not accepted.
                   </p>
                 </div>
+              </label>
+            </div>
+
+            {/* Sizing Options Config */}
+            <div className="p-4 border border-brand-latte/30 bg-white rounded flex flex-col gap-4">
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-gray-900 uppercase tracking-wider mb-1 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.hasSizes || false} 
+                    onChange={e => setFormData({...formData, hasSizes: e.target.checked})} 
+                    className="accent-brand-flamingo w-4 h-4" 
+                  />
+                  Enable Two-Tier Sizing Variants ({isCurrentFormLuggage ? 'Size M & Size L' : 'Baby & Adult'})
+                </label>
+                <p className="text-[10px] text-gray-500">
+                  {isCurrentFormLuggage 
+                    ? 'Allows customers to select between Size M (22"-26" luggage) and Size L (28"-32" luggage).'
+                    : 'Allows customers to choose between baby and adult blanket sizes.'}
+                </p>
               </div>
 
-              <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Care Instructions</label>
-                  <textarea rows={2} className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5" value={formData.care || ''} onChange={e => setFormData({...formData, care: e.target.value})} />
-              </div>
-              
-              {/* Main Image Upload/URL Section */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Main Product Image</label>
-                
-                <div className="flex flex-col gap-4">
-                  <div className="flex gap-2 items-center">
-                      <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                          <LinkIcon size={14} />
-                        </div>
+              {formData.hasSizes && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-brand-latte/20">
+                  {/* Variant 1 */}
+                  <div className="bg-brand-grey/5 p-4 rounded border border-brand-latte/20">
+                    <p className="text-xs font-bold mb-3 text-gray-900 border-b border-brand-latte/20 pb-2 flex items-center justify-between">
+                      <span>{isCurrentFormLuggage ? '🧳 Size M Variant (22" – 26")' : '👶 Baby Variant'}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">babyPrice</span>
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RM)</label>
                         <input 
-                          className="w-full border p-3 pl-9 pr-8 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono text-xs" 
-                          placeholder="Paste Image URL here..."
-                          value={formData.image} 
-                          onChange={e => setFormData({...formData, image: e.target.value})} 
+                          type="number" 
+                          className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white font-mono" 
+                          value={formData.babyPrice} 
+                          onChange={e => setFormData({...formData, babyPrice: Number(e.target.value)})} 
                         />
-                        {formData.image && (
-                          <button 
-                            type="button"
-                            onClick={() => setFormData({...formData, image: ''})}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-400"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
-                      
-                      <span className="text-[10px] text-gray-400 font-bold uppercase mx-1">OR</span>
-                      
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dimensions / Description</label>
+                        <input 
+                          className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" 
+                          value={formData.babySizeDesc || ''} 
+                          onChange={e => setFormData({...formData, babySizeDesc: e.target.value})} 
+                          placeholder={isCurrentFormLuggage ? 'Size M: 22" – 26" Luggage' : '70 cm x 100 cm'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Variant 2 */}
+                  <div className="bg-brand-grey/5 p-4 rounded border border-brand-latte/20">
+                    <p className="text-xs font-bold mb-3 text-gray-900 border-b border-brand-latte/20 pb-2 flex items-center justify-between">
+                      <span>{isCurrentFormLuggage ? '🧳 Size L Variant (28" – 32")' : '🧑 Adult Variant'}</span>
+                      <span className="text-[10px] text-gray-400 font-mono">adultPrice</span>
+                    </p>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Price (RM)</label>
+                        <input 
+                          type="number" 
+                          className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white font-mono" 
+                          value={formData.adultPrice} 
+                          onChange={e => setFormData({...formData, adultPrice: Number(e.target.value)})} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Dimensions / Description</label>
+                        <input 
+                          className="w-full border p-2 text-sm focus:border-brand-flamingo outline-none bg-white" 
+                          value={formData.adultSizeDesc || ''} 
+                          onChange={e => setFormData({...formData, adultSizeDesc: e.target.value})} 
+                          placeholder={isCurrentFormLuggage ? 'Size L: 28" – 32" Luggage' : '150 cm x 100 cm'}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Store Visibility Controls */}
+            <div className="p-4 border border-brand-latte/20 bg-brand-grey/5 rounded flex flex-col gap-3">
+              <label className="flex items-center gap-2 text-xs font-bold text-gray-900 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={formData.isLive !== false} 
+                  onChange={e => setFormData({...formData, isLive: e.target.checked})} 
+                  className="accent-brand-flamingo w-4 h-4" 
+                />
+                Product is Live on Website (Visible to Public)
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-gray-900 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={Boolean(formData.isPosOnly)} 
+                  onChange={e => setFormData({...formData, isPosOnly: e.target.checked})} 
+                  className="accent-brand-flamingo w-4 h-4" 
+                />
+                Set as POS Only (Hidden from Online Store, Cashier Register Only)
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-gray-900 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={Boolean(formData.isCheckoutAddon)} 
+                  onChange={e => setFormData({...formData, isCheckoutAddon: e.target.checked})} 
+                  className="accent-brand-flamingo w-4 h-4" 
+                />
+                Offer as Recommended Checkout Add-On
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-gray-900 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={Boolean(formData.isCakenicOnly)} 
+                  onChange={e => setFormData({...formData, isCakenicOnly: e.target.checked})} 
+                  className="accent-brand-flamingo w-4 h-4" 
+                />
+                Cakenic Event Ticket Only (Exclude from Main Catalog)
+              </label>
+            </div>
+
+            {/* Care instructions */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Care Instructions</label>
+              <textarea 
+                rows={2} 
+                className="w-full border p-3 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 leading-relaxed" 
+                value={formData.care || ''} 
+                onChange={e => setFormData({...formData, care: e.target.value})} 
+              />
+            </div>
+            
+            {/* Main Image Upload/URL Section */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Main Product Image</label>
+              <div className="flex flex-col gap-4">
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                      <LinkIcon size={14} />
+                    </div>
+                    <input 
+                      className="w-full border p-3 pl-9 pr-8 text-sm focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono text-xs" 
+                      placeholder="Paste Image URL here..."
+                      value={formData.image} 
+                      onChange={e => setFormData({...formData, image: e.target.value})} 
+                    />
+                    {formData.image && (
                       <button 
                         type="button"
-                        onClick={() => productFileInputRef.current?.click()}
-                        className="bg-white border border-brand-latte/30 text-gray-600 hover:text-brand-flamingo hover:border-brand-flamingo px-4 py-3 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider min-w-[100px] justify-center"
-                        title="Upload Photo"
-                        disabled={saveStatus === 'uploading'}
+                        onClick={() => setFormData({...formData, image: ''})}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-400"
                       >
-                        {saveStatus === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} 
-                        Upload
+                        <X size={14} />
                       </button>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        ref={productFileInputRef}
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, 'product')}
-                      />
+                    )}
                   </div>
                   
-                  {saveStatus === 'error' && (
-                      <div className="bg-red-50 p-4 rounded border border-red-100 flex flex-col gap-3 mt-2 animate-fade-in">
-                        <div className="flex items-center gap-2 text-red-600 font-bold">
-                          <AlertTriangle size={18} />
-                          <span className="text-xs">Upload Failed</span>
-                        </div>
-                        <div className="text-xs text-gray-700 space-y-2">
-                          <p className="leading-relaxed"><strong>Reason:</strong> {errorMessage}</p>
-                        </div>
-                      </div>
-                  )}
+                  <span className="text-[10px] text-gray-400 font-bold uppercase mx-1">OR</span>
+                  
+                  <button 
+                    type="button"
+                    onClick={() => productFileInputRef.current?.click()}
+                    className="bg-white border border-brand-latte/30 text-gray-600 hover:text-brand-flamingo hover:border-brand-flamingo px-4 py-3 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider min-w-[100px] justify-center"
+                    title="Upload Photo"
+                    disabled={saveStatus === 'uploading'}
+                  >
+                    {saveStatus === 'uploading' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} 
+                    Upload
+                  </button>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    ref={productFileInputRef}
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e, 'product')}
+                  />
+                </div>
+                
+                {saveStatus === 'error' && (
+                  <div className="bg-red-50 p-4 rounded border border-red-100 flex flex-col gap-2 animate-fade-in">
+                    <div className="flex items-center gap-2 text-red-600 font-bold text-xs">
+                      <AlertTriangle size={16} />
+                      <span>Upload Failed</span>
+                    </div>
+                    <p className="text-xs text-gray-700 leading-relaxed">{errorMessage}</p>
+                  </div>
+                )}
 
-                  <div className="flex items-start gap-4 p-4 border border-dashed border-brand-latte/30 bg-brand-grey/5 rounded-[2px] mt-2">
-                      {formData.image ? (
-                        <img src={formData.image} alt="Preview" className="w-20 h-28 object-cover border border-brand-latte/30 bg-white" />
-                      ) : (
-                        <div className="w-20 h-28 bg-brand-latte/10 flex items-center justify-center text-gray-400 text-xs text-center border border-brand-latte/20">No Image</div>
-                      )}
-                      <div>
-                        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-1">Preview & Tips</p>
-                        <p className="text-[10px] text-gray-400 leading-relaxed max-w-xs">
-                          Recommended Size: <strong className="text-gray-600">600x800 px</strong> (Portrait 3:4 Aspect Ratio).
-                        </p>
-                      </div>
+                <div className="flex items-start gap-4 p-4 border border-dashed border-brand-latte/30 bg-brand-grey/5 rounded mt-2">
+                  {formData.image ? (
+                    <img src={formData.image} alt="Preview" className="w-20 h-28 object-cover border border-brand-latte/30 bg-white rounded" />
+                  ) : (
+                    <div className="w-20 h-28 bg-brand-latte/10 flex items-center justify-center text-gray-400 text-xs text-center border border-brand-latte/20 rounded">No Image</div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-700 font-bold uppercase tracking-wider mb-1">Image Preview</p>
+                    <p className="text-[11px] text-gray-500 leading-relaxed max-w-xs">
+                      Supports PNG, JPG, or WebP. Portrait 3:4 aspect ratio recommended (600x800px).
+                    </p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Additional Images Section */}
-              <div className="border-t border-brand-latte/20 pt-6 mt-2">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-4">Gallery Images (Optional)</label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-4">
-                    {formData.additionalImages?.map((img, index) => (
-                      <div key={index} className="relative aspect-[3/4] group bg-gray-50 border border-brand-latte/20">
-                        <img src={img} className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => removeAdditionalImage(index)} className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"><X size={12} /></button>
-                      </div>
-                    ))}
-                    <div className="aspect-[3/4] border border-dashed border-brand-latte/40 bg-brand-grey/5 flex flex-col items-center justify-center gap-2 p-2 text-center hover:bg-brand-grey/10 transition-colors">
-                      <button type="button" onClick={() => additionalFileInputRef.current?.click()} disabled={saveStatus === 'uploading'} className="text-gray-500 hover:text-brand-flamingo flex flex-col items-center">
-                          {saveStatus === 'uploading' ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />} 
-                          <span className="text-[9px] font-bold uppercase mt-1">Upload File</span>
-                      </button>
-                      <input type="file" accept="image/*" ref={additionalFileInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'additional')} />
-                    </div>
-                </div>
-
-                <div className="flex gap-2 items-center mt-2">
-                    <div className="relative flex-1">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><LinkIcon size={14} /></div>
-                        <input className="w-full border p-2 pl-9 pr-4 text-xs focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono" placeholder="Or paste URL for additional image..." value={newAdditionalUrl} onChange={e => setNewAdditionalUrl(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrlToAdditional(); } }} />
-                    </div>
-                    <button type="button" onClick={addUrlToAdditional} disabled={!newAdditionalUrl} className="bg-brand-latte text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo disabled:opacity-50 disabled:cursor-not-allowed rounded-[2px]">Add</button>
+            {/* Additional Images Section */}
+            <div className="border-t border-brand-latte/20 pt-6">
+              <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Gallery Images (Optional)</label>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-4">
+                {formData.additionalImages?.map((img, index) => (
+                  <div key={index} className="relative aspect-[3/4] group bg-gray-50 border border-brand-latte/20 rounded overflow-hidden">
+                    <img src={img} className="w-full h-full object-cover" />
+                    <button 
+                      type="button" 
+                      onClick={() => removeAdditionalImage(index)} 
+                      className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <div className="aspect-[3/4] border border-dashed border-brand-latte/40 bg-brand-grey/5 flex flex-col items-center justify-center gap-2 p-2 text-center hover:bg-brand-grey/10 transition-colors rounded">
+                  <button 
+                    type="button" 
+                    onClick={() => additionalFileInputRef.current?.click()} 
+                    disabled={saveStatus === 'uploading'} 
+                    className="text-gray-500 hover:text-brand-flamingo flex flex-col items-center"
+                  >
+                    {saveStatus === 'uploading' ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />} 
+                    <span className="text-[9px] font-bold uppercase mt-1">Upload File</span>
+                  </button>
+                  <input type="file" accept="image/*" ref={additionalFileInputRef} className="hidden" onChange={(e) => handleFileUpload(e, 'additional')} />
                 </div>
               </div>
 
-              <div className="flex flex-col-reverse md:flex-row justify-end gap-3 mt-4 border-t border-brand-latte/20 pt-6">
-                <button type="button" onClick={() => setIsEditing(false)} className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 border border-transparent hover:border-gray-200" disabled={saveStatus !== 'idle' && saveStatus !== 'error'}>Cancel</button>
-                <button type="submit" disabled={saveStatus !== 'idle' && saveStatus !== 'error'} className={`text-white px-8 py-3 text-[10px] font-bold uppercase tracking-widest rounded-[2px] flex items-center gap-2 transition-all ${ saveStatus === 'saved' ? 'bg-green-600' : 'bg-brand-flamingo hover:bg-brand-flamingo/80' }`}>
-                  {saveStatus === 'saving' ? (<><Loader2 size={14} className="animate-spin" /> Saving...</>) : saveStatus === 'saved' ? (<><Check size={14} /> Saved!</>) : ('Save Product')}
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><LinkIcon size={14} /></div>
+                  <input 
+                    className="w-full border p-2 pl-9 pr-4 text-xs focus:border-brand-flamingo outline-none bg-brand-grey/5 font-mono" 
+                    placeholder="Or paste URL for additional gallery photo..." 
+                    value={newAdditionalUrl} 
+                    onChange={e => setNewAdditionalUrl(e.target.value)} 
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addUrlToAdditional(); } }} 
+                  />
+                </div>
+                <button 
+                  type="button" 
+                  onClick={addUrlToAdditional} 
+                  disabled={!newAdditionalUrl} 
+                  className="bg-brand-latte text-white px-4 py-2 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo disabled:opacity-50 disabled:cursor-not-allowed rounded"
+                >
+                  Add
                 </button>
               </div>
-            </form>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col-reverse md:flex-row justify-end gap-3 mt-4 border-t border-brand-latte/20 pt-6">
+              <button 
+                type="button" 
+                onClick={() => setIsEditing(false)} 
+                className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-500 hover:text-gray-900 border border-transparent hover:border-gray-200" 
+                disabled={saveStatus !== 'idle' && saveStatus !== 'error'}
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={saveStatus !== 'idle' && saveStatus !== 'error'} 
+                className={`text-white px-8 py-3 text-[10px] font-bold uppercase tracking-widest rounded flex items-center gap-2 transition-all ${ 
+                  saveStatus === 'saved' ? 'bg-green-600' : 'bg-brand-flamingo hover:bg-brand-flamingo/90' 
+                }`}
+              >
+                {saveStatus === 'saving' ? (<><Loader2 size={14} className="animate-spin" /> Saving...</>) : saveStatus === 'saved' ? (<><Check size={14} /> Saved!</>) : ('Save Product')}
+              </button>
+            </div>
+          </form>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        /* Main Catalog View with Filters */
+        <div className="space-y-6">
+          {/* SEARCH & FILTERS BAR */}
+          <div className="bg-white p-4 md:p-5 border border-brand-latte/20 rounded shadow-sm space-y-4">
+            {/* Top row: Search & Status Filter */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search by product name, design, or SKU (e.g. Dream Castle, LC-...)"
+                  className="w-full border border-brand-latte/30 rounded pl-10 pr-9 py-2.5 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-brand-flamingo bg-brand-grey/5"
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Toggle */}
+              <div className="flex items-center gap-1.5 self-end sm:self-auto bg-brand-grey/10 p-1 rounded border border-brand-latte/20">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+                    statusFilter === 'all' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  All Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('live')}
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-1 ${
+                    statusFilter === 'live' ? 'bg-green-600 text-white shadow-xs' : 'text-gray-500 hover:text-green-700'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  Live
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('hidden')}
+                  className={`px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded transition-colors ${
+                    statusFilter === 'hidden' ? 'bg-gray-800 text-white shadow-xs' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+                >
+                  Hidden
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom row: Collection Filter Pills */}
+            <div className="border-t border-brand-latte/15 pt-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Filter size={12} className="text-brand-gold" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Filter By Collection:</span>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+                {/* All Collections */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('all')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'all'
+                      ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                      : 'bg-white text-gray-700 border-brand-latte/30 hover:border-gray-400 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>✨ All Products</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {counts.all}
+                  </span>
+                </button>
+
+                {/* Luggage Cover (The New Collection) */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('Luggage Cover')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'Luggage Cover'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm ring-2 ring-amber-300'
+                      : 'bg-amber-50 text-amber-900 border-amber-300 hover:border-amber-500 hover:bg-amber-100/60'
+                  }`}
+                >
+                  <span>🧳 Luggage Cover</span>
+                  <span className="text-[9px] font-extrabold bg-amber-400 text-amber-950 px-1 rounded uppercase tracking-wider">
+                    NEW
+                  </span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'Luggage Cover' ? 'bg-white/20 text-white' : 'bg-amber-200/70 text-amber-900'
+                  }`}>
+                    {counts.luggage}
+                  </span>
+                </button>
+
+                {/* Blankets */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('Blankets')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'Blankets'
+                      ? 'bg-brand-gold text-white border-brand-gold shadow-sm'
+                      : 'bg-white text-gray-700 border-brand-latte/30 hover:border-brand-gold/50 hover:bg-brand-gold/5'
+                  }`}
+                >
+                  <span>🧸 Blankets</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'Blankets' ? 'bg-white/20 text-white' : 'bg-brand-gold/10 text-brand-gold'
+                  }`}>
+                    {counts.blankets}
+                  </span>
+                </button>
+
+                {/* Swaddles */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('Swaddle')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'Swaddle'
+                      ? 'bg-brand-flamingo text-white border-brand-flamingo shadow-sm'
+                      : 'bg-white text-gray-700 border-brand-latte/30 hover:border-brand-flamingo/50 hover:bg-brand-flamingo/5'
+                  }`}
+                >
+                  <span>🌸 Swaddle</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'Swaddle' ? 'bg-white/20 text-white' : 'bg-brand-flamingo/10 text-brand-flamingo'
+                  }`}>
+                    {counts.swaddles}
+                  </span>
+                </button>
+
+                {/* Add-ons */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('Add-ons')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'Add-ons'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                      : 'bg-white text-gray-700 border-brand-latte/30 hover:border-purple-300 hover:bg-purple-50'
+                  }`}
+                >
+                  <span>💝 Add-ons</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'Add-ons' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {counts.addons}
+                  </span>
+                </button>
+
+                {/* Events / Cakenic */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCollectionFilter('Cakenic 2026')}
+                  className={`px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center gap-2 border ${
+                    selectedCollectionFilter === 'Cakenic 2026'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
+                      : 'bg-white text-gray-700 border-brand-latte/30 hover:border-rose-300 hover:bg-rose-50'
+                  }`}
+                >
+                  <span>🎟️ Events</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    selectedCollectionFilter === 'Cakenic 2026' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+                  }`}>
+                    {counts.events}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Active Filter Summary Bar */}
+            {(selectedCollectionFilter !== 'all' || statusFilter !== 'all' || searchQuery) && (
+              <div className="flex items-center justify-between text-xs text-gray-600 pt-2 border-t border-brand-latte/10">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-900">
+                    Showing {filteredProducts.length} of {safeProducts.length} products
+                  </span>
+                  {selectedCollectionFilter !== 'all' && (
+                    <span className="bg-brand-latte/20 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                      Collection: {selectedCollectionFilter}
+                    </span>
+                  )}
+                  {statusFilter !== 'all' && (
+                    <span className="bg-brand-latte/20 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                      Status: {statusFilter}
+                    </span>
+                  )}
+                  {searchQuery && (
+                    <span className="bg-brand-latte/20 text-gray-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                      Search: &ldquo;{searchQuery}&rdquo;
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCollectionFilter('all');
+                    setStatusFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="text-xs text-brand-flamingo font-bold hover:underline cursor-pointer"
+                >
+                  Reset all filters
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* PRODUCTS GRID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {safeProducts.length === 0 && (
               <div className="col-span-full text-center p-12 text-gray-400 italic flex flex-col items-center">
                 <p className="mb-4">No products found in database.</p>
                 <div className="p-6 bg-white border border-dashed border-brand-latte/50 rounded flex flex-col items-center max-w-md">
                   <Database className="text-brand-flamingo mb-3" size={32} strokeWidth={1} />
                   <h4 className="font-serif text-lg text-gray-900 mb-2">Initialize Database?</h4>
-                  <p className="text-xs text-gray-500 mb-4 text-center">Your Firebase database is currently empty. Click below to upload the sample products to the database.</p>
-                  <button type="button" onClick={handleSeedData} disabled={isSeeding} className="bg-brand-gold text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded-[2px] flex items-center gap-2 cursor-pointer relative z-10">
-                    {isSeeding ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />} Load Sample Data
+                  <p className="text-xs text-gray-500 mb-4 text-center">
+                    Your Firebase database is currently empty. Click below to upload the complete sample catalog (Luggage Covers, Blankets, and Cakenic Tickets).
+                  </p>
+                  <button 
+                    type="button" 
+                    onClick={handleSeedData} 
+                    disabled={isSeeding} 
+                    className="bg-brand-gold text-white px-6 py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-brand-flamingo transition-colors rounded flex items-center gap-2 cursor-pointer"
+                  >
+                    {isSeeding ? <Loader2 className="animate-spin" size={14} /> : <Upload size={14} />} Load Sample Catalog
                   </button>
                 </div>
               </div>
-          )}
-          {safeProducts.map(product => {
-            const isAddon = isAddonProduct(product);
-            const isCakenic = isCakenicProduct(product);
-            const isBlanket = isBlanketProduct(product);
-            const collectionTag = isCakenic ? 'Event' : (isAddon ? 'Add-on' : (isBlanket ? 'Blanket' : 'Swaddle'));
-            return (
-              <div key={product.id} className="bg-white border border-brand-latte/20 p-4 flex gap-4 items-center group rounded-[2px] shadow-sm">
-                <img src={product.image} alt={product.name} className="w-16 h-16 md:w-20 md:h-20 object-cover bg-gray-100 rounded-[2px]" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <h4 className="font-serif text-base md:text-lg text-gray-900 leading-tight truncate">{product.name}</h4>
-                    <span className={`text-[9px] font-sans font-bold uppercase px-1.5 py-0.5 rounded tracking-wider border ${
-                      isCakenic
-                        ? 'bg-rose-100 text-rose-800 border-rose-200'
-                        : isAddon 
-                          ? 'bg-gray-100 text-gray-500 border-gray-200' 
-                          : isBlanket 
-                            ? 'bg-brand-gold/10 text-brand-gold border-brand-gold/20' 
-                            : 'bg-brand-flamingo/10 text-brand-flamingo border-brand-flamingo/20'
-                    }`}>
-                      {collectionTag}
-                    </span>
+            )}
+
+            {safeProducts.length > 0 && filteredProducts.length === 0 && (
+              <div className="col-span-full bg-white border border-dashed border-brand-latte/40 p-12 text-center rounded flex flex-col items-center justify-center">
+                <Layers size={36} className="text-gray-300 mb-3" />
+                <h4 className="font-serif text-lg text-gray-900 mb-1">No products found</h4>
+                <p className="text-xs text-gray-500 mb-4 max-w-sm">
+                  No products matched your selected collection &ldquo;{selectedCollectionFilter}&rdquo; or search query.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedCollectionFilter('all');
+                      setSearchQuery('');
+                      setStatusFilter('all');
+                    }}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded"
+                  >
+                    Show All Products
+                  </button>
+                  <button
+                    onClick={() => handleCreate(selectedCollectionFilter === 'all' ? 'Luggage Cover' : selectedCollectionFilter)}
+                    className="bg-brand-flamingo text-white hover:bg-brand-flamingo/90 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded"
+                  >
+                    + Add New Product
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {filteredProducts.map(product => {
+              const badge = getCollectionBadge(product);
+              const isLuggage = isLuggageCoverProduct(product);
+              const hasNoReplacement = product.noSizeReplacement || isLuggage;
+
+              return (
+                <div 
+                  key={product.id} 
+                  className={`bg-white border rounded shadow-xs p-4 flex gap-4 items-start group transition-all duration-200 hover:shadow-md ${
+                    isLuggage ? 'border-amber-200/80 hover:border-amber-400' : 'border-brand-latte/20 hover:border-brand-latte/50'
+                  }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative w-18 h-24 shrink-0 rounded overflow-hidden bg-gray-100 border border-brand-latte/20">
+                    <img 
+                      src={product.image || '/luggage_cover_preview.jpg'} 
+                      alt={product.name} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      onError={(e) => {
+                        (e.target as HTMLElement).setAttribute('src', '/luggage_cover_preview.jpg');
+                      }}
+                    />
+                    {product.badge && (
+                      <span className="absolute top-1 left-1 bg-gray-900/90 text-white text-[8px] font-bold uppercase px-1 py-0.5 rounded tracking-wider shadow-xs">
+                        {product.badge}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex flex-col">
-                    <p className="text-brand-gold font-script text-base md:text-lg">RM {product.price}</p>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <div className="flex items-center gap-1">
-                        <Box size={10} className="text-gray-400" />
-                        <span className={`text-[10px] font-bold uppercase tracking-wide ${ (product.stock || 0) <= 5 ? 'text-red-500' : 'text-gray-500' }`}>
-                          Stock: {product.stock || 0}
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    {/* Collection badge & Status */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                      <span className={`text-[9px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wider border flex items-center gap-1 ${badge.style}`}>
+                        <span>{badge.icon}</span>
+                        <span>{badge.label}</span>
+                      </span>
+
+                      {product.isPosOnly && (
+                        <span className="bg-gray-800 text-white text-[8px] font-bold uppercase px-1.5 py-0.5 rounded tracking-wider">
+                          POS ONLY
                         </span>
+                      )}
+
+                      {hasNoReplacement && (
+                        <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded tracking-wider" title="Strictly No Size Replacements Policy Applies">
+                          ⚠️ No Size Exch.
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h4 className="font-serif text-base text-gray-900 font-semibold leading-snug truncate" title={product.name}>
+                      {product.name}
+                    </h4>
+
+                    {/* Artwork Design distinction */}
+                    {product.designName && (
+                      <p className="text-[10px] text-gray-500 font-sans truncate">
+                        <span className="text-gray-400 font-semibold">Design:</span> {product.designName}
+                      </p>
+                    )}
+
+                    {/* SKU */}
+                    {product.sku && (
+                      <p className="text-[9px] font-mono text-gray-400 mt-0.5 truncate">
+                        SKU: {product.sku}
+                      </p>
+                    )}
+
+                    {/* Pricing & Sizing summary */}
+                    <div className="mt-2 pt-2 border-t border-brand-latte/15 flex flex-col">
+                      <div className="flex items-baseline justify-between gap-2">
+                        {product.hasSizes ? (
+                          <div className="text-xs">
+                            <span className="font-script text-base text-brand-gold font-bold">
+                              RM {product.babyPrice || product.price} – RM {product.adultPrice || 108}
+                            </span>
+                            <span className="text-[9px] text-gray-500 ml-1.5 font-sans">
+                              ({isLuggage ? 'M & L Sizes' : 'Baby & Adult'})
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="font-script text-base text-brand-gold font-bold">
+                            RM {product.price}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className={`w-1.5 h-1.5 rounded-full ${product.isLive !== false ? 'bg-green-500' : 'bg-gray-300'}`} />
-                        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                          {product.isLive !== false ? 'Live' : 'Hidden'}
-                        </span>
+
+                      {/* Stock & Live Indicator */}
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          <Box size={11} className="text-gray-400" />
+                          <span className={`text-[10px] font-bold uppercase tracking-wide ${
+                            (product.stock || 0) <= 0 
+                              ? 'text-red-500 font-extrabold' 
+                              : (product.stock || 0) <= 5 
+                              ? 'text-amber-600' 
+                              : 'text-gray-500'
+                          }`}>
+                            {(product.stock || 0) <= 0 ? 'Out of Stock' : `Stock: ${product.stock}`}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <span className={`w-1.5 h-1.5 rounded-full ${product.isLive !== false ? 'bg-green-500' : 'bg-gray-300'}`} />
+                          <span className="text-[9px] font-bold uppercase tracking-wide text-gray-500">
+                            {product.isLive !== false ? 'Live' : 'Hidden'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button 
+                      onClick={() => handleEdit(product)} 
+                      className="p-1.5 text-gray-400 hover:text-brand-flamingo hover:bg-brand-flamingo/5 rounded transition-colors"
+                      title="Edit Product"
+                    >
+                      <Edit2 size={15} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteClick(product.id)} 
+                      disabled={deletingId === product.id} 
+                      className={`p-1.5 transition-all rounded ${
+                        deleteConfirmation === product.id 
+                          ? 'text-red-600 bg-red-100 text-[9px] font-bold uppercase px-2 py-1' 
+                          : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                      }`} 
+                      title={deleteConfirmation === product.id ? "Click again to confirm delete" : "Delete Product"}
+                    >
+                      {deletingId === product.id ? (
+                        <Loader2 size={15} className="animate-spin text-red-500" />
+                      ) : deleteConfirmation === product.id ? (
+                        <span>Confirm?</span>
+                      ) : (
+                        <Trash2 size={15} />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  <button onClick={() => handleEdit(product)} className="text-gray-400 hover:text-brand-flamingo p-1"><Edit2 size={16} /></button>
-                  <button onClick={() => handleDeleteClick(product.id)} disabled={deletingId === product.id} className={`p-1 transition-all rounded ${ deleteConfirmation === product.id ? 'text-red-500 bg-red-50 w-full text-[10px] font-bold uppercase flex items-center justify-center gap-1 p-2' : 'text-gray-400 hover:text-red-400' }`} title={deleteConfirmation === product.id ? "Click to Confirm" : "Delete"}>
-                    {deletingId === product.id ? (<Loader2 size={16} className="animate-spin" />) : deleteConfirmation === product.id ? (<>Confirm?</>) : (<Trash2 size={16} />)}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </>
