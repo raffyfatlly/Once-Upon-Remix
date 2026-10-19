@@ -98,7 +98,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                 <div className="max-w-xl text-center md:text-left flex flex-col items-center md:items-start">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[9px] font-bold uppercase tracking-widest mb-3 mx-auto md:mx-0">
                     <Sparkles size={11} />
-                    <span>Coming Soon • Pre-Order Open</span>
+                    <span>Pre-Order Open</span>
                   </div>
                   <h3 className="font-serif text-2xl text-gray-900 mb-2 text-center md:text-left">
                     Luggage Cover Size Guide & Specs

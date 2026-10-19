@@ -111,7 +111,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
           {/* Updated Text Description for Pre-orders */}
           {isPreOrder ? (
             <span className="font-serif italic text-[10px] md:text-xs text-brand-gold mt-1 font-medium">
-              {isLuggage ? 'Pre-Order Open • Coming Soon' : 'Sold Out • Pre-order ships in 2 weeks'}
+              {isLuggage ? 'Pre-Order Open' : 'Sold Out • Pre-order ships in 2 weeks'}
             </span>
           ) : isSoldOut ? (
             <span className="font-serif italic text-[10px] md:text-xs text-red-500 mt-1 font-medium">

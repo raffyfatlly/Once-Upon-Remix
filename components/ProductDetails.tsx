@@ -394,7 +394,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ products, onAddT
                    <Clock size={18} className="mt-0.5 flex-shrink-0" />
                    <div>
                      <p className="font-bold text-xs uppercase tracking-wider mb-1">
-                       {isLuggage ? 'Coming Soon • Pre-Order Open' : 'Item Sold Out'}
+                       {isLuggage ? 'Pre-Order Open' : 'Item Sold Out'}
                      </p>
                      <p className="font-serif italic text-sm text-gray-600">
                        {isLuggage ? (

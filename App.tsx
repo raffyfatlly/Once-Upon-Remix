@@ -358,7 +358,7 @@ const StoreFront: React.FC<{
                         </p>
                         <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/20 text-[8.5px] font-bold uppercase tracking-[0.12em] mt-2">
                           <Clock size={9} />
-                          <span>Coming Soon • Pre-Order</span>
+                          <span>Pre-Order Open</span>
                         </div>
                       </div>
 
@@ -449,7 +449,7 @@ const StoreFront: React.FC<{
                             )}
                             {isLuggage && (
                               <span className="text-[9px] font-sans font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-gold/15 text-brand-gold border border-brand-gold/25">
-                                Coming Soon • Pre-Order
+                                Pre-Order Open
                               </span>
                             )}
                           </div>
