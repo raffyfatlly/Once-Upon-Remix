@@ -99,7 +99,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart, 
         <p className="font-serif text-gray-500 mb-4 max-w-[250px] mx-auto text-sm leading-relaxed line-clamp-2 opacity-80">{descriptionPreview}</p>
         <div className="flex flex-col items-center gap-2">
           <div className="inline-block px-5 py-1.5 rounded-full border border-brand-latte/30 bg-white shadow-sm group-hover:border-brand-flamingo/30 transition-colors">
-            <span className="font-sans font-bold text-sm tracking-widest text-gray-900">RM {product.price}</span>
+            <span className="font-sans font-bold text-sm tracking-widest text-gray-900">
+              {product.hasSizes && (product.babyPrice || product.adultPrice)
+                ? (product.babyPrice && product.adultPrice && product.babyPrice !== product.adultPrice
+                    ? `RM ${product.babyPrice} – RM ${product.adultPrice}`
+                    : `RM ${product.babyPrice || product.adultPrice || product.price}`)
+                : `RM ${product.price}`}
+            </span>
           </div>
           
           {/* Updated Text Description for Pre-orders */}

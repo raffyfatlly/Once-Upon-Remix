@@ -46,6 +46,16 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
     return sortCollectionProducts(collectionName, list);
   }, [products, collectionName, isLuggageCollection]);
 
+  const luggageSizeMPrice = React.useMemo(() => {
+    const item = filteredProducts.find(p => p.babyPrice != null || p.price != null);
+    return item?.babyPrice ?? item?.price ?? 98;
+  }, [filteredProducts]);
+
+  const luggageSizeLPrice = React.useMemo(() => {
+    const item = filteredProducts.find(p => p.adultPrice != null);
+    return item?.adultPrice ?? 118;
+  }, [filteredProducts]);
+
   return (
     <div className="min-h-screen bg-white pt-24 pb-20 animate-fade-in">
        {/* Simple Elegant Header */}
@@ -119,7 +129,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                     <p className="text-[11px] text-gray-500 font-sans leading-tight">
                       Approx 58–63 cm (H) × 39–42 cm (W) × 23–27 cm (D)
                     </p>
-                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 98</span>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM {luggageSizeMPrice}</span>
                   </div>
 
                   <div className="bg-white/90 backdrop-blur-sm p-4 rounded-2xl border border-brand-latte/20 shadow-xs">
@@ -130,7 +140,7 @@ export const CollectionView: React.FC<CollectionViewProps> = ({ products, onAddT
                     <p className="text-[11px] text-gray-500 font-sans leading-tight">
                       Approx 65–70 cm (H) × 47–50 cm (W) × 26–30 cm (D)
                     </p>
-                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM 118</span>
+                    <span className="text-[10px] text-brand-gold font-serif mt-1 block font-medium">RM {luggageSizeLPrice}</span>
                   </div>
                 </div>
               </div>
