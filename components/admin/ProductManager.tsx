@@ -114,6 +114,59 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
     return { label: 'Swaddle', icon: '🌸', style: 'bg-brand-flamingo/15 text-brand-flamingo border-brand-flamingo/30' };
   };
 
+  const getCategoryDefaultImage = (p: Product): string => {
+    const name = (p.name || '').toLowerCase();
+    if (isLuggageCoverProduct(p)) {
+      if (name.includes('parisian')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792298424226_The_Parisian_Flight_luggage_artwork.png?alt=media&token=407936c3-559b-4c6a-9dd3-ad356979f1da';
+      if (name.includes('carousel') || name.includes('jubilee')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792298687550_The_Carousel_luggage_artwork.png?alt=media&token=48bb2fc3-6d53-4a74-9c06-91c029544e54';
+      if (name.includes('castle') || name.includes('dream')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792298304514_The_Castle_luggage_artwork.png?alt=media&token=e78ee638-eeef-47bc-9e7a-4d2567bbb16e';
+      if (name.includes('balloon')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1792477951374_45219.jpg?alt=media&token=db8f7b6f-e0f1-4171-8353-ceb73e157262';
+      return '/luggage_cover_preview.jpg';
+    }
+    if (isCakenicProduct(p)) {
+      if (name.includes('johor')) return 'https://i.postimg.cc/k4nQz3k2/IMG-20260805-WA0016.jpg';
+      if (name.includes('putrajaya')) return 'https://i.postimg.cc/vTK541Dh/IMG-20260805-WA0017.jpg';
+      return 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80';
+    }
+    if (isAddonProduct(p)) {
+      if (name.includes('mirror') || name.includes('signature')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782501093124_1000177117.png?alt=media&token=6fb4e66f-dcc5-47e2-961f-e3f366a51d5f';
+      if (name.includes('3rd') || name.includes('box')) return 'https://i.postimg.cc/y8rptDBL/3rd-Edition-Box.png';
+      return 'https://i.postimg.cc/Znyb8SXx/IMG-20260528-204109.png';
+    }
+    if (isSwaddleProduct(p)) {
+      if (name.includes('express') || name.includes('dreamland')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782497520663_hf_20260625_070121_893f9b35-d892-42e1-8d4f-3f0451c860b7.png?alt=media&token=c222a62f-8d73-423a-ad53-085cbf2f63a4';
+      if (name.includes('bloomfield') || name.includes('park')) return 'https://i.postimg.cc/wTsY9b4m/Town-Park-Website.png';
+      if (name.includes('parisian')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782489173096_hf_20260625_080454_48a7c933-68ad-4fb8-b1e4-5ba7504e7851.png?alt=media&token=a8605cf5-7a5e-4e45-91ec-9b379985b6f4';
+      if (name.includes('toy') || name.includes('waltz')) return 'https://i.postimg.cc/HsZ1m8g3/Music-Box-Website-(1).png';
+      if (name.includes('town') || name.includes('square')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782498941313_hf_20260625_055732_4a78d75b-bd29-49c3-86f3-854f01767ddc.png?alt=media&token=fed62418-4f2b-4c71-8878-fd5eff2b0702';
+      if (name.includes('balloon')) return 'https://i.postimg.cc/44D3gtNX/Ballon-in-Sky-Website.png';
+      if (name.includes('cottage')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782498658074_hf_20260625_071405_b12cb5e6-0a25-4f68-9cca-dc33b34762b9.png?alt=media&token=c9cdb95e-6624-43f8-9b11-8dc3f2aa865a';
+      if (name.includes('clock')) return 'https://i.postimg.cc/LhKpcrfJ/Clock-tower-Website-(1).png';
+      if (name.includes('candy')) return 'https://i.postimg.cc/9QXv1m1V/the-Candy-house-website-swaddle.png';
+      if (name.includes('tailor')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782497718085_hf_20260625_095127_40469671-2d46-4f9e-9cf2-50f2b5b082a1.png?alt=media&token=ed460bc5-240c-4db4-a5ed-798944e3ef96';
+      if (name.includes('whimsy')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1785771771027_hf_20260803_094530_88ef0a04-a0a6-442a-876c-e96b3dc415c1__2_.png?alt=media&token=9b563149-1531-4ed3-9dcf-12376f3f814c';
+      if (name.includes('dresser')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782498300761_hf_20260625_080138_916e14ee-d7b3-445b-8502-f68cf9db23e2.png?alt=media&token=2349406b-d0e3-4474-a959-3f15394f4d30';
+      return 'https://i.postimg.cc/HsZ1m8g3/Music-Box-Website-(1).png';
+    }
+    // Blanket category
+    if (name.includes('castle')) return 'https://i.postimg.cc/NGZkTM36/0ekjb3nj55rmt0cw35dbhcxvym.png';
+    if (name.includes('balloon')) return 'https://i.postimg.cc/RFC4ch9D/The-Balloon-Ride-Blanket-(website).png';
+    if (name.includes('marshmallow')) return 'https://i.postimg.cc/8ztbGWWj/the-marshmellwo-factory-website-blanket.jpg';
+    if (name.includes('voyage')) return 'https://i.postimg.cc/yNjxt8Cf/the-little-voyage-blanket-website.jpg';
+    if (name.includes('storybook')) return 'https://i.postimg.cc/BbLnkJNn/hf-20260630-143117-375e8d98-d52e-498d-bec6-fef11e091f6b.png';
+    if (name.includes('carousel') || name.includes('jubilee')) return 'https://i.postimg.cc/xCdvjk4J/hf-20260621-132500-877d6234-2046-4040-be9d-df84527273c7.png';
+    if (name.includes('dresser')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1780996824874_1000173648.png?alt=media&token=3d907de4-25b9-49bb-95b1-2bc0f1294a40';
+    if (name.includes('whimsy')) return 'https://i.postimg.cc/k4wMZ8wp/The-Whimsy-Fair-Blanket-(Website).png';
+    if (name.includes('playroom') || name.includes('pink')) return 'https://i.postimg.cc/x1cXkbhc/the-pink-playroom-blanket-website.jpg';
+    if (name.includes('boutique')) return 'https://i.postimg.cc/J4XLMtNz/wmremove-transformed.png';
+    if (name.includes('express') || name.includes('dreamland')) return 'https://i.postimg.cc/cHGKfK5p/Gemini-Generated-Image-hmi8hlhmi8hlhmi8.png';
+    if (name.includes('parisian')) return 'https://i.postimg.cc/sDtHVKfx/1ekds8naxhrmt0cw35g9rc005r.png';
+    if (name.includes('tailor')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782497718085_hf_20260625_095127_40469671-2d46-4f9e-9cf2-50f2b5b082a1.png?alt=media&token=ed460bc5-240c-4db4-a5ed-798944e3ef96';
+    if (name.includes('town') || name.includes('square')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782498941313_hf_20260625_055732_4a78d75b-bd29-49c3-86f3-854f01767ddc.png?alt=media&token=fed62418-4f2b-4c71-8878-fd5eff2b0702';
+    if (name.includes('train')) return 'https://firebasestorage.googleapis.com/v0/b/once-upon-24709.firebasestorage.app/o/images%2F1782497520663_hf_20260625_070121_893f9b35-d892-42e1-8d4f-3f0451c860b7.png?alt=media&token=c222a62f-8d73-423a-ad53-085cbf2f63a4';
+    return 'https://i.postimg.cc/9QVBP1b5/Gemini-Generated-Image-s2ybu4s2ybu4s2yb.png';
+  };
+
   const rawProducts = Array.isArray(products) ? products : [];
   
   // Priority ordering by group: Blankets (0), Swaddles (1), Luggage Cover (2), Add-ons (3), Events (4)
@@ -1540,21 +1593,30 @@ export const ProductManager: React.FC<ProductManagerProps> = ({ products }) => {
                   }`}
                 >
                   {/* Thumbnail */}
-                  <div className="relative w-16 sm:w-20 h-24 shrink-0 rounded overflow-hidden bg-gray-100 border border-brand-latte/20">
-                    <img 
-                      src={product.image || '/luggage_cover_preview.jpg'} 
-                      alt={product.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                      onError={(e) => {
-                        (e.target as HTMLElement).setAttribute('src', '/luggage_cover_preview.jpg');
-                      }}
-                    />
-                    {product.badge && (
-                      <span className="absolute top-1 left-1 bg-gray-900/90 text-white text-[8px] font-bold uppercase px-1 py-0.5 rounded tracking-wider shadow-xs">
-                        {product.badge}
-                      </span>
-                    )}
-                  </div>
+                  {(() => {
+                    const categoryDefault = getCategoryDefaultImage(product);
+                    const isCurrentLuggage = isLuggageCoverProduct(product);
+                    const hasValidCustomImg = Boolean(product.image && product.image.trim() && (isCurrentLuggage || (!product.image.includes('luggage') && !product.image.includes('45219') && product.image !== '/luggage_cover_preview.jpg')));
+                    const finalSrc = hasValidCustomImg ? product.image : categoryDefault;
+
+                    return (
+                      <div className="relative w-16 sm:w-20 h-24 shrink-0 rounded overflow-hidden bg-gray-100 border border-brand-latte/20">
+                        <img 
+                          src={finalSrc} 
+                          alt={product.name} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                          onError={(e) => {
+                            (e.target as HTMLElement).setAttribute('src', categoryDefault);
+                          }}
+                        />
+                        {product.badge && (
+                          <span className="absolute top-1 left-1 bg-gray-900/90 text-white text-[8px] font-bold uppercase px-1 py-0.5 rounded tracking-wider shadow-xs">
+                            {product.badge}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Info */}
                   <div className="flex-1 min-w-0 overflow-hidden">

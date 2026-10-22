@@ -1542,7 +1542,14 @@ export const POSSystem: React.FC<POSSystemProps> = ({ products }) => {
                   className="text-left group border border-brand-latte/20 rounded overflow-hidden hover:border-brand-flamingo transition-colors flex flex-col h-full bg-gray-50 relative cursor-pointer"
                 >
                   <div className="aspect-[4/3] bg-gray-200 relative overflow-hidden">
-                    <img src={product.image || '/luggage_cover_preview.jpg'} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img 
+                      src={product.image || (isLuggage ? '/luggage_cover_preview.jpg' : isBlanket ? 'https://i.postimg.cc/9QVBP1b5/Gemini-Generated-Image-s2ybu4s2ybu4s2yb.png' : isAddon ? 'https://i.postimg.cc/Znyb8SXx/IMG-20260528-204109.png' : isCakenic ? 'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=800&q=80' : 'https://i.postimg.cc/HsZ1m8g3/Music-Box-Website-(1).png')} 
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                      onError={(e) => {
+                        (e.target as HTMLElement).setAttribute('src', isLuggage ? '/luggage_cover_preview.jpg' : isBlanket ? 'https://i.postimg.cc/9QVBP1b5/Gemini-Generated-Image-s2ybu4s2ybu4s2yb.png' : 'https://i.postimg.cc/HsZ1m8g3/Music-Box-Website-(1).png');
+                      }}
+                    />
                     <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
                       <span className={`text-[8px] font-sans font-bold px-1.5 py-0.5 uppercase tracking-widest rounded-sm ${
                         isCakenic
